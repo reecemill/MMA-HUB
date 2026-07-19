@@ -1,0 +1,31 @@
+@page
+@model Web.Pages.EventsModel
+@{
+    ViewData["Title"] = "Events";
+}
+
+<h1>Events</h1>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Venue</th>
+            <th>Location</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var ev in Model.Events)
+        {
+            <tr>
+                <td>@ev.Title</td>
+                <td>@ev.Status</td>
+                <td>@(ev.EventDate?.ToString("MMM dd, yyyy") ?? ev.EventDateLabel ?? "-")</td>
+                <td>@ev.Venue</td>
+                <td>@(ev.City ?? ev.Country ?? "-")</td>
+            </tr>
+        }
+    </tbody>
+</table>

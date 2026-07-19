@@ -1,0 +1,27 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="hero">
+    <h1>MMA <span class="accent">Stats</span></h1>
+    <p class="sub">UFC fighter data, events &amp; predictions</p>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card text-center">
+            <h5>Fighters</h5>
+            <div class="count">@Model.FighterCount</div>
+            <a asp-page="/Fighters" class="btn btn-primary">Browse Fighters</a>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card text-center">
+            <h5>Events</h5>
+            <div class="count">@Model.EventCount</div>
+            <a asp-page="/Events" class="btn btn-primary">Browse Events</a>
+        </div>
+    </div>
+</div>
