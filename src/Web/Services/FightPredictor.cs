@@ -178,6 +178,8 @@ public class FighterProfile
 public class ModelInfo
 {
     public string TrainedOn { get; set; } = "";
+    // The first date the model's weights learned from; null if every year was used.
+    public DateTime? TrainedSince { get; set; }
     public DateTime SnapshotDate { get; set; }
     public int TrainingBouts { get; set; }
     public int EloK { get; set; }

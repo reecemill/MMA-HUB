@@ -106,6 +106,9 @@ BEFORE = {"k": 128, "features": _CURRENT}
 NONLINEAR_SETS = ["+ striking + grappling", "+ striking + grappling + age", "+ stats + matchups + age"]
 # Pseudo-counts that pull a fighter's rates toward the league average until there's data.
 PRIOR_MINUTES, PRIOR_STRIKES, PRIOR_TAKEDOWNS = 15.0, 20.0, 5.0
+# The first year a model's weights learn from (None: every year). Fighters' histories always
+# use every earlier fight; this only drops early-era bouts from the rows the weights fit.
+TRAIN_SINCE = [None, "2005-01-01", "2010-01-01", "2015-01-01"]
 
 
 def load(db_path):
@@ -420,6 +423,12 @@ def scores(y, p):
             "brier": brier_score_loss(y, p), "bouts": int(len(y))}
 
 
+def learning_rows(data, since, before):
+    """The bouts a model's weights are fitted on: from `since` (or the start) up to `before`."""
+    rows = data[data.date < before]
+    return rows if since is None else rows[rows.date >= since]
+
+
 def paired_bootstrap(y, p_new, p_old, draws=2000):
     """Mean and 95% interval of (new - old) in log loss and in accuracy, resampling test bouts.
 
@@ -470,52 +479,55 @@ def main():
           f"{phys.birth.notna().mean():.1%} of fighters")
 
     # --- Choose settings on the validation years -------------------------------------
-    # Each family searches Elo K, feature sets and its own settings; the lowest log loss wins.
-    # Height and reach stay candidates in "everything" so they keep being checked.
+    # Each family searches Elo K, feature sets, the first year its weights learn from, and its
+    # own settings; the lowest log loss wins. Height and reach stay candidates in "everything"
+    # so they keep being checked.
     walks = {k: walk_bouts(bouts, phys, snapshot_date, k, fights, priors) for k in (32, 64, 128)}
     print("\nValidation (train before 2022, test 2022-2023):")
     best = {}
     for family, makers in FAMILIES.items():
         sets = FEATURE_SETS if family == "logistic regression" else {n: FEATURE_SETS[n] for n in NONLINEAR_SETS}
         for k, (data, _) in walks.items():
-            train = data[data.date < VALIDATION_START]
             valid = one_side(data[(data.date >= VALIDATION_START) & (data.date < TEST_START)])
-            for name, feats in sets.items():
-                for make in makers:
-                    model = make(feats).fit(train)
-                    s = scores(valid.y, model.predict(valid))
-                    print(f"  {family:<20} K={k:<4} {name:<34} {model.describe():<48} "
-                          f"accuracy {s['accuracy']:.3f}  log loss {s['log_loss']:.4f}")
-                    if family not in best or s["log_loss"] < best[family]["log_loss"]:
-                        best[family] = {"log_loss": s["log_loss"], "k": k, "name": name, "feats": feats,
-                                        "make": make, "describe": model.describe()}
+            for since in TRAIN_SINCE:
+                train = learning_rows(data, since, VALIDATION_START)
+                for name, feats in sets.items():
+                    for make in makers:
+                        model = make(feats).fit(train)
+                        s = scores(valid.y, model.predict(valid))
+                        print(f"  {family:<20} K={k:<4} since {since or 'all':<10} {name:<34} {model.describe():<48} "
+                              f"accuracy {s['accuracy']:.3f}  log loss {s['log_loss']:.4f}")
+                        if family not in best or s["log_loss"] < best[family]["log_loss"]:
+                            best[family] = {"log_loss": s["log_loss"], "k": k, "since": since, "name": name,
+                                            "feats": feats, "make": make, "describe": model.describe()}
     print("\nBest of each family on validation:")
     for family, b in best.items():
-        print(f"  {family:<20} log loss {b['log_loss']:.4f}  K={b['k']}, {b['name']}, {b['describe']}")
+        print(f"  {family:<20} log loss {b['log_loss']:.4f}  K={b['k']}, since {b['since'] or 'all'}, "
+              f"{b['name']}, {b['describe']}")
 
     # --- Report once on the test years -----------------------------------------------
-    def test_predictions(k, feats, make):
+    def test_predictions(k, since, feats, make):
         data = walks[k][0]
-        model = make(feats).fit(data[data.date < TEST_START])
+        model = make(feats).fit(learning_rows(data, since, TEST_START))
         test = one_side(data[data.date >= TEST_START])
         return model, test, model.predict(test)
 
     family_test = {}
     for family, b in best.items():
-        family_model, test, family_test[family] = test_predictions(b["k"], b["feats"], b["make"])
+        family_model, test, family_test[family] = test_predictions(b["k"], b["since"], b["feats"], b["make"])
         # P(A beats B) + P(B beats A) must be exactly 1 for every model.
         flipped = test.copy()
         flipped[list(FEATURES)] = -flipped[list(FEATURES)]
         assert np.allclose(family_test[family] + family_model.predict(flipped), 1), family
-    _, _, p_before = test_predictions(BEFORE["k"], BEFORE["features"], lambda f: Model(f, 1.0))
+    _, _, p_before = test_predictions(BEFORE["k"], None, BEFORE["features"], lambda f: Model(f, 1.0))
 
     # The site runs logistic regression, so that's what's exported; the other families are
     # reported next to it to show whether a non-linear model would be worth deploying.
     site = best["logistic regression"]
-    k, name, feats = site["k"], site["name"], site["feats"]
+    k, since, name, feats = site["k"], site["since"], site["name"], site["feats"]
     data, histories = walks[k]
     train = data[data.date < TEST_START]
-    model, test, p = test_predictions(k, feats, site["make"])
+    model, test, p = test_predictions(k, since, feats, site["make"])
     c = 1.0
     elo_only = Model(["elo"], c).fit(train).predict(test)
     # Baseline with no model: pick whoever has the better UFC win rate (coin flip on ties).
@@ -557,7 +569,7 @@ def main():
             buckets.append({"from": lo, "to": min(hi, 1.0), "bouts": int(mask.sum()),
                             "predicted": float(fav[mask].mean()),
                             "actual": float(((p > 0.5) == (test.y == 1))[mask].mean())})
-    print(f"\nExported model (logistic regression, K={k}, {name}) on the test years:")
+    print(f"\nExported model (logistic regression, K={k}, since {since or 'all'}, {name}) on the test years:")
     for label, s in results.items():
         if label not in ("families", "comparisons"):
             print(f"  {label:<20} accuracy {s['accuracy']:.3f}"
@@ -570,8 +582,9 @@ def main():
         print("\n--dry-run: nothing written")
         return
 
-    # --- Final model on every bout, exported for the site ----------------------------
-    final = Model(feats, c).fit(data)
+    # --- Final model on every bout since the chosen start, exported for the site -------
+    final_rows = learning_rows(data, since, last_result + pd.Timedelta(days=1))
+    final = Model(feats, c).fit(final_rows)
     coefs = final.lr.coef_[0]
     order = np.argsort(-np.abs(coefs))
     print("\nFinal model weights (per scaled unit):")
@@ -580,9 +593,10 @@ def main():
 
     OUT.mkdir(parents=True, exist_ok=True)
     model_json = {
-        "trainedOn": f"{data.date.min():%Y-%m-%d} to {last_result:%Y-%m-%d}",
+        "trainedOn": f"{final_rows.date.min():%Y-%m-%d} to {last_result:%Y-%m-%d}",
+        "trainedSince": since,
         "snapshotDate": f"{snapshot_date:%Y-%m-%d}",
-        "trainingBouts": int(len(data)),
+        "trainingBouts": int(len(final_rows)),
         "eloK": k,
         "featureSet": name,
         "features": [{"key": f, "label": FEATURES[f], "scale": float(s), "weight": float(w)}

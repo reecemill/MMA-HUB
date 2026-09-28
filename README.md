@@ -23,19 +23,19 @@ A logistic regression on each fighter's UFC history before the fight:
 
 Everything is computed from fights before the one being predicted, so the model never sees a result it's asked to predict. The striking and grappling rates are built fight by fight from ufcstats.com's per-fight stats (via [a public export](https://github.com/Greco1899/scrape_ufc_stats), matched to 98.9% of bouts), and pulled toward the league average for fighters with little UFC fight time. UFC.com's career stats aren't used, because they're current totals that include the fights being predicted.
 
-The settings (model, feature set, and Elo K-factor) were chosen on 2022–2023, then the model was trained on everything before 2024 and tested once on the 1,300 fights from January 2024 to July 2026:
+The settings (model, feature set, Elo K-factor, and the first year the weights learn from) were chosen on 2022–2023. The model's weights learn from fights since 2010: including earlier fights made predictions worse on the validation years, probably because the sport has changed so much since its early days. Those fights still count toward every fighter's record, Elo rating, and stats. The model was then trained on 2010–2023 and tested once on the 1,300 fights from January 2024 to July 2026:
 
 | Method | Picks the winner | Log loss |
 |---|---|---|
-| This model | 63.6% | 0.641 |
-| The model before per-fight stats (record, Elo, finishing) | 59.8% | 0.665 |
+| This model | 64.6% | 0.633 |
+| The model before per-fight stats (record, Elo, finishing; every year) | 59.8% | 0.665 |
 | Whoever has the better UFC win rate | 60.2% | – |
 | Whoever has the higher Elo rating | 58.2% | 0.676 |
 | Coin flip | 50.0% | 0.693 |
 
-Adding striking, grappling, and age picks 3.8 percentage points more winners than the old model (95% paired-bootstrap interval 1.2 to 6.4) and 3.4 more than backing the better record (0.4 to 6.2), with a lower log loss. The probabilities are a little cautious: when it gives the favorite 60–70%, the favorite wins 68% of the time.
+It picks 4.8 percentage points more winners than the old model (95% paired-bootstrap interval 1.9 to 7.5) and 4.4 more than backing the better record (1.4 to 7.4), with a lower log loss. On 2024–2026 its probabilities are a little cautious (when it gives the favorite 60–70%, the favorite wins 67% of the time), but not on the validation years, so no correction was fitted to the test years.
 
-Gradient boosting (62.2%, log loss 0.644) and a small neural network (62.7%, 0.640), given the same features and chosen the same way, were both within chance of the logistic regression, so the site keeps the model whose reasons for each pick can be shown exactly. Height, reach, stance, and matchup terms (one fighter's attack against the other's defense) made predictions worse on the validation years and were left out.
+Gradient boosting (63.8%, log loss 0.641) and a small neural network (63.8%, 0.636) had the same choices of features and training years and were chosen the same way. Both were worse than the logistic regression on log loss (the network edged it on the validation years by 0.0004, well within noise), so the site keeps the model whose reasons for each pick can be shown exactly. Height, reach, stance, and matchup terms (one fighter's attack against the other's defense) made predictions worse on the validation years and were left out.
 
 ### Data problems found along the way
 

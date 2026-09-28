@@ -18,9 +18,17 @@
 
     <h2 class="stats-section-title">How well it does</h2>
     <p>
-        The model was trained on every UFC fight before @test.From.ToString("MMMM yyyy") and then asked to pick
-        the @test.Model.Bouts.ToString("N0") fights from @test.From.ToString("MMM yyyy") to @test.To.ToString("MMM yyyy"),
-        using only what was known the day before each one.
+        @if (Model.Info.TrainedSince is DateTime since)
+        {
+            <text>The model learned from UFC fights from @since.Year until @test.From.ToString("MMMM yyyy") (each fighter's
+            history still goes back to UFC 1)</text>
+        }
+        else
+        {
+            <text>The model was trained on every UFC fight before @test.From.ToString("MMMM yyyy")</text>
+        }
+        and then asked to pick the @test.Model.Bouts.ToString("N0") fights from @test.From.ToString("MMM yyyy") to
+        @test.To.ToString("MMM yyyy"), using only what was known the day before each one.
     </p>
     <div class="table-card section-card">
         <table class="table">
@@ -37,7 +45,9 @@
     @if (gain != null && overRule != null)
     {
         <p>
-            Adding each fighter's striking and grappling history made the difference. The model picks
+            Adding each fighter's striking and grappling history@(Model.Info.TrainedSince is DateTime s
+                ? $", and learning only from fights since {s.Year},"
+                : "") made the difference. The model picks
             @HowItWorksModel.Points(gain[0]) percentage points more winners than it did before
             (95% interval @HowItWorksModel.Points(gain[1]) to @HowItWorksModel.Points(gain[2])), and
             @HowItWorksModel.Points(overRule[0]) points more than simply backing the fighter with the better record
@@ -105,8 +115,8 @@
 
     <h2 class="stats-section-title">Three kinds of model</h2>
     <p>
-        A gradient-boosted tree model and a small neural network were given the same fights and features, and chosen and
-        tested the same way:
+        A gradient-boosted tree model and a small neural network were given the same fights and the same choices of
+        features and training years, and chosen and tested the same way:
     </p>
     <div class="table-card section-card">
         <table class="table">
@@ -145,6 +155,14 @@
 
     <h2 class="stats-section-title">What was tried and left out</h2>
     <ul>
+        @if (Model.Info.TrainedSince is DateTime firstYear)
+        {
+            <li>
+                <strong>Learning from fights before @firstYear.Year</strong> made predictions worse on the years held out
+                for choosing the model, probably because the sport has changed so much since its early days. Those fights
+                still count toward each fighter's record, Elo rating, and stats.
+            </li>
+        }
         <li>
             <strong>Height, reach, and stance</strong> made predictions worse on the years held out for choosing the model.
             Many reaches are missing from the data.
