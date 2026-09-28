@@ -489,3 +489,10 @@ $RECYCLE.BIN/
 
 # Personal planning notes
 PlanForMmaSite.rtf
+
+# Data snapshot (made from the local database; shipped to the Space, not the repo)
+/data/
+
+# Model training environment and its check output
+ml/.venv/
+ml/reference_predictions.json

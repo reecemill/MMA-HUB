@@ -35,6 +35,8 @@ public class Event
     public string? VenueDateLabel { get; set; }
     public string? VenueWeekday { get; set; }
     public string? RawJson { get; set; }
+    // Set by the scraper when Cito lists the same event twice; the site hides these.
+    public Guid? DuplicateOfEventId { get; set; }
     public List<Bout> Bouts { get; set; } = [];
 }
 
@@ -68,6 +70,8 @@ public class Bout
     public Fighter? Fighter2 { get; set; }
 
     public Guid? WinnerFighterId { get; set; }
+    // Set by the scraper when this fight is also listed on an earlier event.
+    public string? DuplicateOfBoutId { get; set; }
 
     public List<BoutFighterStats> Stats { get; set; } = [];
 }

@@ -57,7 +57,9 @@ public class FightersModel : PageModel
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(f => f.Name != null && EF.Functions.ILike(f.Name, $"%{search}%"));
+            // ToLower().Contains works on both Postgres and the SQLite snapshot, unlike ILike.
+            string term = search.Trim().ToLower();
+            query = query.Where(f => f.Name != null && f.Name.ToLower().Contains(term));
         }
 
         Fighters = SelectedStatus == "active"

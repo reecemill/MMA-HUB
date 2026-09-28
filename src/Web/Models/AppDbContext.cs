@@ -15,8 +15,16 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Fighter>().Property(f => f.RawJson).HasColumnType("jsonb");
-        modelBuilder.Entity<Event>().Property(e => e.RawJson).HasColumnType("jsonb");
+        // jsonb is Postgres-only; the SQLite snapshot stores RawJson as plain text.
+        if (Database.IsNpgsql())
+        {
+            modelBuilder.Entity<Fighter>().Property(f => f.RawJson).HasColumnType("jsonb");
+            modelBuilder.Entity<Event>().Property(e => e.RawJson).HasColumnType("jsonb");
+        }
+
+        // Every query skips events and bouts the scraper marked as duplicates.
+        modelBuilder.Entity<Event>().HasQueryFilter(e => e.DuplicateOfEventId == null);
+        modelBuilder.Entity<Bout>().HasQueryFilter(b => b.DuplicateOfBoutId == null);
 
         modelBuilder.Entity<FighterHeroStat>()
             .HasOne<Fighter>()
