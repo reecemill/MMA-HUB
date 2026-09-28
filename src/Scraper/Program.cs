@@ -10,6 +10,12 @@ IConfiguration config = new ConfigurationBuilder()
     .AddUserSecrets<Program>()
     .Build();
 
+if (args.Contains("--dedupe-only"))
+{
+    EventDeduplicator.Run(config["ConnectionStrings:MmaDb"]!);
+    return;
+}
+
 string? apiKey = config["CitoApi:ApiKey"];
 
 var client = new HttpClient();
@@ -524,6 +530,9 @@ using (AppDbContext db = new AppDbContext(dbConnectionString))
 
 Console.WriteLine("Saved " + allBoutFighterStats.Count + " bout fighter stats to the database.");
 
+EventDeduplicator.Run(dbConnectionString);
+
+
 class EventPageInfo
 {
     [JsonPropertyName("meta")]
@@ -717,6 +726,10 @@ class Event
     [JsonPropertyName("locationText")]
     public string? LocationText { get; set; }
 
+    // Set by EventDeduplicator when Cito lists this event twice; not from the API.
+    [JsonIgnore]
+    public Guid? DuplicateOfEventId { get; set; }
+
     [JsonPropertyName("imageUrl")]
     public string? ImageUrl { get; set; }
 
@@ -823,6 +836,9 @@ class Bout
     public string? Fighter2Outcome { get; set; }
 
     public Guid? WinnerFighterId { get; set; }
+
+    // Set by EventDeduplicator when the same fight is also listed on another event.
+    public string? DuplicateOfBoutId { get; set; }
 }
 
 // Landed/attempted counts come from the API as a single "X of Y" string per stat —
