@@ -1,0 +1,138 @@
+@page "{id}"
+@model Web.Pages.BoutDetailModel
+@{
+    ViewData["Title"] = (Model.BoutData.Fighter1Name ?? "?") + " vs " + (Model.BoutData.Fighter2Name ?? "?");
+    ViewData["HideBackground"] = true;
+
+    var f1 = Model.BoutData.Fighter1;
+    var f2 = Model.BoutData.Fighter2;
+    var s1 = f1?.Stats;
+    var s2 = f2?.Stats;
+    var fs1 = Model.Fighter1FightStats;
+    var fs2 = Model.Fighter2FightStats;
+}
+
+@if (!string.IsNullOrWhiteSpace(Model.EventSlug))
+{
+    <a asp-page="/EventDetail" asp-route-slug="@Model.EventSlug" class="back-link">&larr; Back to Event</a>
+}
+else
+{
+    <a asp-page="/Events" class="back-link">&larr; Back to Events</a>
+}
+
+<div class="fighter-header">
+    <h1>
+        @(Model.BoutData.Fighter1Name ?? "TBD") <span class="fighter-nickname">vs</span> @(Model.BoutData.Fighter2Name ?? "TBD")
+    </h1>
+    <p class="fighter-meta">
+        @Model.BoutData.WeightClass
+        @if (Model.BoutData.TitleBout)
+        {
+            <span class="champion-badge">Title Bout</span>
+        }
+        @if (Model.BoutData.IsCancelled)
+        {
+            <text>&middot; Cancelled</text>
+        }
+        else if (Model.BoutData.Status == "completed")
+        {
+            <text>&middot; @Model.BoutData.Method @(Model.BoutData.ResultRound != null ? $"(Round {Model.BoutData.ResultRound}, {Model.BoutData.ResultTime})" : "")</text>
+        }
+        else
+        {
+            <text>&middot; Upcoming</text>
+        }
+    </p>
+</div>
+
+<div class="fighter-bio-grid">
+    <div class="bio-tile">
+        <span class="bio-label">@(f1 != null ? "Fighter 1" : "")</span>
+        <span class="bio-value">
+            @if (f1 != null)
+            {
+                <a asp-page="/FighterDetail" asp-route-slug="@f1.Slug" class="fighter-link">@f1.Name</a>
+            }
+            else
+            {
+                @(Model.BoutData.Fighter1Name ?? "TBD")
+            }
+        </span>
+    </div>
+    <div class="bio-tile">
+        <span class="bio-label">@(f2 != null ? "Fighter 2" : "")</span>
+        <span class="bio-value">
+            @if (f2 != null)
+            {
+                <a asp-page="/FighterDetail" asp-route-slug="@f2.Slug" class="fighter-link">@f2.Name</a>
+            }
+            else
+            {
+                @(Model.BoutData.Fighter2Name ?? "TBD")
+            }
+        </span>
+    </div>
+</div>
+
+@if (fs1 != null || fs2 != null)
+{
+    <h2 class="stats-section-title">Fight Stats</h2>
+    <div class="table-card">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>@(f1?.Name ?? Model.BoutData.Fighter1Name ?? "Fighter 1")</th>
+                    <th>Stat</th>
+                    <th>@(f2?.Name ?? Model.BoutData.Fighter2Name ?? "Fighter 2")</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>@(fs1?.Knockdowns.ToString() ?? "-")</td><td>Knockdowns</td><td>@(fs2?.Knockdowns.ToString() ?? "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.SigStrikesLanded} of {fs1.SigStrikesAttempted}" : "-")</td><td>Sig. Strikes</td><td>@(fs2 != null ? $"{fs2.SigStrikesLanded} of {fs2.SigStrikesAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.TotalStrikesLanded} of {fs1.TotalStrikesAttempted}" : "-")</td><td>Total Strikes</td><td>@(fs2 != null ? $"{fs2.TotalStrikesLanded} of {fs2.TotalStrikesAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.TakedownsLanded} of {fs1.TakedownsAttempted}" : "-")</td><td>Takedowns</td><td>@(fs2 != null ? $"{fs2.TakedownsLanded} of {fs2.TakedownsAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1?.SubmissionAttempts.ToString() ?? "-")</td><td>Submission Attempts</td><td>@(fs2?.SubmissionAttempts.ToString() ?? "-")</td></tr>
+                <tr><td>@(fs1?.Reversals.ToString() ?? "-")</td><td>Reversals</td><td>@(fs2?.Reversals.ToString() ?? "-")</td></tr>
+                <tr><td>@(fs1?.ControlTime ?? "-")</td><td>Control Time</td><td>@(fs2?.ControlTime ?? "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.HeadLanded} of {fs1.HeadAttempted}" : "-")</td><td>Head Strikes</td><td>@(fs2 != null ? $"{fs2.HeadLanded} of {fs2.HeadAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.BodyLanded} of {fs1.BodyAttempted}" : "-")</td><td>Body Strikes</td><td>@(fs2 != null ? $"{fs2.BodyLanded} of {fs2.BodyAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.LegLanded} of {fs1.LegAttempted}" : "-")</td><td>Leg Strikes</td><td>@(fs2 != null ? $"{fs2.LegLanded} of {fs2.LegAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.DistanceLanded} of {fs1.DistanceAttempted}" : "-")</td><td>Distance Strikes</td><td>@(fs2 != null ? $"{fs2.DistanceLanded} of {fs2.DistanceAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.ClinchLanded} of {fs1.ClinchAttempted}" : "-")</td><td>Clinch Strikes</td><td>@(fs2 != null ? $"{fs2.ClinchLanded} of {fs2.ClinchAttempted}" : "-")</td></tr>
+                <tr><td>@(fs1 != null ? $"{fs1.GroundLanded} of {fs1.GroundAttempted}" : "-")</td><td>Ground Strikes</td><td>@(fs2 != null ? $"{fs2.GroundLanded} of {fs2.GroundAttempted}" : "-")</td></tr>
+            </tbody>
+        </table>
+    </div>
+}
+else if (s1 != null || s2 != null)
+{
+    <h2 class="stats-section-title">Career Stats Comparison</h2>
+    <div class="table-card">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>@(f1?.Name ?? Model.BoutData.Fighter1Name ?? "Fighter 1")</th>
+                    <th>Stat</th>
+                    <th>@(f2?.Name ?? Model.BoutData.Fighter2Name ?? "Fighter 2")</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>@(f1?.RecordText ?? "-")</td><td>Record</td><td>@(f2?.RecordText ?? "-")</td></tr>
+                <tr><td>@(s1 != null ? Web.Pages.FighterDetailModel.FormatPercent(s1.StrikingAccuracy) : "-")</td><td>Striking Accuracy</td><td>@(s2 != null ? Web.Pages.FighterDetailModel.FormatPercent(s2.StrikingAccuracy) : "-")</td></tr>
+                <tr><td>@(s1?.SigStrikesLandedPerMin.ToString("0.00") ?? "-")</td><td>Sig. Str. Landed/Min</td><td>@(s2?.SigStrikesLandedPerMin.ToString("0.00") ?? "-")</td></tr>
+                <tr><td>@(s1?.SigStrikesAbsorbedPerMin.ToString("0.00") ?? "-")</td><td>Sig. Str. Absorbed/Min</td><td>@(s2?.SigStrikesAbsorbedPerMin.ToString("0.00") ?? "-")</td></tr>
+                <tr><td>@(s1 != null ? Web.Pages.FighterDetailModel.FormatPercent(s1.SigStrikesDefense) : "-")</td><td>Sig. Str. Defense</td><td>@(s2 != null ? Web.Pages.FighterDetailModel.FormatPercent(s2.SigStrikesDefense) : "-")</td></tr>
+                <tr><td>@(s1 != null ? Web.Pages.FighterDetailModel.FormatPercent(s1.TakedownAccuracy) : "-")</td><td>Takedown Accuracy</td><td>@(s2 != null ? Web.Pages.FighterDetailModel.FormatPercent(s2.TakedownAccuracy) : "-")</td></tr>
+                <tr><td>@(s1?.TakedownAvgPer15Min.ToString("0.00") ?? "-")</td><td>Takedown Avg / 15 Min</td><td>@(s2?.TakedownAvgPer15Min.ToString("0.00") ?? "-")</td></tr>
+                <tr><td>@(s1 != null ? Web.Pages.FighterDetailModel.FormatPercent(s1.TakedownDefense) : "-")</td><td>Takedown Defense</td><td>@(s2 != null ? Web.Pages.FighterDetailModel.FormatPercent(s2.TakedownDefense) : "-")</td></tr>
+                <tr><td>@(s1?.SubmissionAvgPer15Min.ToString("0.00") ?? "-")</td><td>Submission Avg / 15 Min</td><td>@(s2?.SubmissionAvgPer15Min.ToString("0.00") ?? "-")</td></tr>
+                <tr><td>@(s1?.KnockdownAvg.ToString("0.00") ?? "-")</td><td>Knockdown Avg</td><td>@(s2?.KnockdownAvg.ToString("0.00") ?? "-")</td></tr>
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <p class="fighter-meta">No stats available for this matchup yet.</p>
+}

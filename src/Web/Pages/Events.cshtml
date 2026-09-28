@@ -2,30 +2,68 @@
 @model Web.Pages.EventsModel
 @{
     ViewData["Title"] = "Events";
+    ViewData["HideBackground"] = true;
+    // Url.Page omits a route value entirely when it's null, and an absent "year"
+    // means something different now (defaults to the current year) than an explicit
+    // "all" — so every link that isn't the year dropdown itself must pass one or the other.
+    var yearParam = Model.SelectedYear?.ToString() ?? "all";
 }
 
 <h1>Events</h1>
 
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Title</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th>Venue</th>
-            <th>Location</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var ev in Model.Events)
+<div class="division-tabs">
+    <a class="tab @(Model.SelectedType is null ? "active" : "")"
+       href="@Url.Page("Events", new { year = yearParam, sort = Model.SelectedSort })">All Types</a>
+    <a class="tab @(Model.SelectedType == "numbered" ? "active" : "")"
+       href="@Url.Page("Events", new { year = yearParam, type = "numbered", sort = Model.SelectedSort })">Numbered</a>
+    <a class="tab @(Model.SelectedType == "fightnight" ? "active" : "")"
+       href="@Url.Page("Events", new { year = yearParam, type = "fightnight", sort = Model.SelectedSort })">Fight Night</a>
+</div>
+
+<form method="get" class="year-select">
+    @if (!string.IsNullOrWhiteSpace(Model.SelectedType))
+    {
+        <input type="hidden" name="type" value="@Model.SelectedType" />
+    }
+    <input type="hidden" name="sort" value="@Model.SelectedSort" />
+    <select name="year" onchange="this.form.submit()">
+        <option value="all" selected="@(Model.SelectedYear is null)">All Years</option>
+        @foreach (var year in Model.Years)
         {
-            <tr>
-                <td>@ev.Title</td>
-                <td>@ev.Status</td>
-                <td>@(ev.EventDate?.ToString("MMM dd, yyyy") ?? ev.EventDateLabel ?? "-")</td>
-                <td>@ev.Venue</td>
-                <td>@(ev.City ?? ev.Country ?? "-")</td>
-            </tr>
+            <option value="@year" selected="@(Model.SelectedYear == year)">@year</option>
         }
-    </tbody>
-</table>
+    </select>
+</form>
+
+<div class="division-tabs">
+    <a class="tab @(Model.SelectedSort == "desc" ? "active" : "")"
+       href="@Url.Page("Events", new { year = yearParam, type = Model.SelectedType, sort = "desc" })">Newest First</a>
+    <a class="tab @(Model.SelectedSort == "asc" ? "active" : "")"
+       href="@Url.Page("Events", new { year = yearParam, type = Model.SelectedType, sort = "asc" })">Oldest First</a>
+</div>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Venue</th>
+                <th>Location</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var ev in Model.Events)
+            {
+                <tr>
+                    <td><a asp-page="/EventDetail" asp-route-slug="@ev.Slug" class="fighter-link">@ev.Title</a></td>
+                    <td>@ev.Status</td>
+                    <td>@(ev.EventDate?.ToString("MMM dd, yyyy") ?? ev.EventDateLabel ?? "-")</td>
+                    <td>@(ev.Venue ?? "-")</td>
+                    <td>@(ev.LocationText ?? ev.City ?? ev.Country ?? "-")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

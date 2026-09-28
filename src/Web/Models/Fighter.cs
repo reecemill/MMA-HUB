@@ -17,6 +17,7 @@ public class Fighter
     public bool IsActive { get; set; }
     public string? ChampionStatus { get; set; }
     public int? P4pRank { get; set; }
+    public int? Rank { get; set; }
     public int? RecordWins { get; set; }
     public int? RecordLosses { get; set; }
     public int? RecordDraws { get; set; }
@@ -38,6 +39,7 @@ public class Fighter
     public string? Bio { get; set; }
     public string? RawJson { get; set; }
     public List<FighterHeroStat> HeroStatRows { get; set; } = [];
+    public FighterStats? Stats { get; set; }
 }
 
 public class FighterHeroStat
@@ -46,4 +48,29 @@ public class FighterHeroStat
     public Guid FighterId { get; set; }
     public string StatKey { get; set; } = "";
     public string StatValue { get; set; } = "";
+}
+
+public class FighterStats
+{
+    public Guid FighterId { get; set; }
+    public int SigStrikesLanded { get; set; }
+    public int SigStrikesAttempted { get; set; }
+    public decimal StrikingAccuracy { get; set; }
+    public decimal SigStrikesLandedPerMin { get; set; }
+    public decimal SigStrikesAbsorbedPerMin { get; set; }
+    public decimal SigStrikesDefense { get; set; }
+    public int TakedownsLanded { get; set; }
+    public int TakedownsAttempted { get; set; }
+    public decimal TakedownAccuracy { get; set; }
+    public decimal TakedownAvgPer15Min { get; set; }
+    public decimal TakedownDefense { get; set; }
+    public decimal SubmissionAvgPer15Min { get; set; }
+    public decimal KnockdownAvg { get; set; }
+    public int AverageFightTimeSeconds { get; set; }
+    public decimal StandingStrikePercent { get; set; }
+    public decimal ClinchStrikePercent { get; set; }
+    public decimal GroundStrikePercent { get; set; }
+    public decimal HeadStrikePercent { get; set; }
+    public decimal BodyStrikePercent { get; set; }
+    public decimal LegStrikePercent { get; set; }
 }

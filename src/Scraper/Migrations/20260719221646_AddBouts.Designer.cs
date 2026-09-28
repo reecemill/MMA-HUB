@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Scraper.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260719221646_AddBouts")]
+    partial class AddBouts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -103,96 +106,6 @@ namespace Scraper.Migrations
                     b.HasIndex("WinnerFighterId");
 
                     b.ToTable("Bouts");
-                });
-
-            modelBuilder.Entity("BoutFighterStats", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<int>("BodyAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("BodyLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("BoutId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ClinchAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ClinchLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ControlTime")
-                        .HasColumnType("text");
-
-                    b.Property<int>("DistanceAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("DistanceLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("FighterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("FighterSlug")
-                        .HasColumnType("text");
-
-                    b.Property<int>("GroundAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("GroundLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("HeadAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("HeadLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Knockdowns")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LegAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LegLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Reversals")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SigStrikesAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SigStrikesLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SubmissionAttempts")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TakedownsAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TakedownsLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalStrikesAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalStrikesLanded")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BoutId");
-
-                    b.HasIndex("FighterId");
-
-                    b.ToTable("BoutFighterStats");
                 });
 
             modelBuilder.Entity("Event", b =>
@@ -577,20 +490,6 @@ namespace Scraper.Migrations
                     b.HasOne("Fighter", null)
                         .WithMany()
                         .HasForeignKey("WinnerFighterId")
-                        .OnDelete(DeleteBehavior.SetNull);
-                });
-
-            modelBuilder.Entity("BoutFighterStats", b =>
-                {
-                    b.HasOne("Bout", null)
-                        .WithMany()
-                        .HasForeignKey("BoutId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Fighter", null)
-                        .WithMany()
-                        .HasForeignKey("FighterId")
                         .OnDelete(DeleteBehavior.SetNull);
                 });
 

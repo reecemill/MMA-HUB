@@ -1,0 +1,176 @@
+@page "{slug}"
+@model Web.Pages.FighterDetailModel
+@{
+    ViewData["Title"] = Model.FighterData.Name ?? "Fighter";
+    ViewData["HideBackground"] = true;
+}
+
+<a asp-page="/Fighters" class="back-link">&larr; Back to Fighters</a>
+
+<div class="fighter-header">
+    <h1>
+        @if (Model.FighterData.Rank != null)
+        {
+            <span class="rank-badge">#@Model.FighterData.Rank</span>
+        }
+        @Model.FighterData.Name
+    </h1>
+    @if (!string.IsNullOrWhiteSpace(Model.FighterData.Nickname))
+    {
+        <p class="fighter-nickname">"@Model.FighterData.Nickname"</p>
+    }
+    <p class="fighter-meta">
+        @Model.FighterData.Division
+        @if (!string.IsNullOrWhiteSpace(Model.FighterData.ChampionStatus) && Model.FighterData.ChampionStatus != "none")
+        {
+            <span class="champion-badge">Champion</span>
+        }
+        &middot; @(Model.FighterData.IsActive ? "Active" : "Inactive")
+    </p>
+</div>
+
+<div class="fighter-bio-grid">
+    <div class="bio-tile"><span class="bio-label">Record</span><span class="bio-value">@(Model.FighterData.RecordText ?? "-")</span></div>
+    <div class="bio-tile"><span class="bio-label">Age</span><span class="bio-value">@(Model.FighterData.Age?.ToString() ?? "-")</span></div>
+    <div class="bio-tile"><span class="bio-label">Height</span><span class="bio-value">@(Model.FighterData.HeightInches ?? "-")"</span></div>
+    <div class="bio-tile"><span class="bio-label">Reach</span><span class="bio-value">@(Model.FighterData.ReachInches ?? "-")"</span></div>
+    <div class="bio-tile"><span class="bio-label">Weight</span><span class="bio-value">@(Model.FighterData.WeightLbs ?? "-") lbs</span></div>
+    <div class="bio-tile"><span class="bio-label">Stance</span><span class="bio-value">@(Model.FighterData.Stance ?? "-")</span></div>
+    <div class="bio-tile"><span class="bio-label">Country</span><span class="bio-value">@(Model.FighterData.Country ?? "-")</span></div>
+    <div class="bio-tile"><span class="bio-label">Fighting Style</span><span class="bio-value">@(Model.FighterData.FightingStyle ?? "-")</span></div>
+</div>
+
+@if (Model.WinMethodChartCss != null)
+{
+    <div class="charts-row">
+        <div class="chart-card">
+            <h5>Win Method</h5>
+            <div class="donut" style="background: conic-gradient(@Html.Raw(Model.WinMethodChartCss))"></div>
+            <ul class="chart-legend">
+                @foreach (var item in Model.WinMethodLegend)
+                {
+                    <li><span class="legend-dot" style="background: @item.Color"></span>@item.Label: @item.Value</li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+@{
+    var stats = Model.FighterData.Stats;
+}
+
+@if (Model.SummaryStats.Count > 0 || stats != null)
+{
+    <h2 class="stats-section-title">Stats &amp; Records</h2>
+}
+
+@if (Model.SummaryStats.Count > 0)
+{
+    <div class="summary-banner">
+        @foreach (var stat in Model.SummaryStats)
+        {
+            <div class="summary-stat">
+                <span class="count">@stat.Value</span>
+                <span class="label">@stat.Label</span>
+            </div>
+        }
+    </div>
+}
+
+@if (stats != null)
+{
+    <div class="charts-row">
+        <div class="chart-card accuracy-card">
+            <div class="radial-progress" style="background: conic-gradient(@Html.Raw(Model.StrikingAccuracyGradient))">
+                <span class="radial-progress-value">@Web.Pages.FighterDetailModel.FormatPercent(stats.StrikingAccuracy)</span>
+            </div>
+            <div>
+                <h5>Striking Accuracy</h5>
+                <ul class="accuracy-card-stats">
+                    <li>Sig. Strikes Landed: @stats.SigStrikesLanded</li>
+                    <li>Sig. Strikes Attempted: @stats.SigStrikesAttempted</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="chart-card accuracy-card">
+            <div class="radial-progress" style="background: conic-gradient(@Html.Raw(Model.TakedownAccuracyGradient))">
+                <span class="radial-progress-value">@Web.Pages.FighterDetailModel.FormatPercent(stats.TakedownAccuracy)</span>
+            </div>
+            <div>
+                <h5>Takedown Accuracy</h5>
+                <ul class="accuracy-card-stats">
+                    <li>Takedowns Landed: @stats.TakedownsLanded</li>
+                    <li>Takedowns Attempted: @stats.TakedownsAttempted</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-row">
+        <div class="chart-card performance-card">
+            <h5>Offensive Stats</h5>
+            <div class="metric-grid">
+                <div class="metric"><span class="count">@stats.SigStrikesLandedPerMin.ToString("0.00")</span><span class="label">Sig Str Landed/Min</span></div>
+                <div class="metric"><span class="count">@stats.TakedownAvgPer15Min.ToString("0.00")</span><span class="label">Takedown Avg</span></div>
+                <div class="metric"><span class="count">@stats.SubmissionAvgPer15Min.ToString("0.00")</span><span class="label">Submission Avg</span></div>
+                <div class="metric"><span class="count">@stats.KnockdownAvg.ToString("0.00")</span><span class="label">Knockdown Avg</span></div>
+            </div>
+        </div>
+
+        <div class="chart-card performance-card">
+            <h5>Defensive Stats</h5>
+            <div class="metric-grid">
+                <div class="metric"><span class="count">@stats.SigStrikesAbsorbedPerMin.ToString("0.00")</span><span class="label">Sig Str Absorbed/Min</span></div>
+                <div class="metric"><span class="count">@Web.Pages.FighterDetailModel.FormatPercent(stats.SigStrikesDefense)</span><span class="label">Sig Str Defense</span></div>
+                <div class="metric"><span class="count">@Web.Pages.FighterDetailModel.FormatPercent(stats.TakedownDefense)</span><span class="label">Takedown Defense</span></div>
+                <div class="metric"><span class="count">@Web.Pages.FighterDetailModel.FormatFightTime(stats.AverageFightTimeSeconds)</span><span class="label">Avg Fight Time</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-row">
+        <div class="table-card stat-bars">
+            <h5>Strikes by Position</h5>
+            @foreach (var item in Model.StrikePositionBreakdown)
+            {
+                <div class="stat-bar-row">
+                    <span class="stat-bar-label">@item.Label</span>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" style="width: @((item.Percent * 100).ToString("0.##"))%"></div>
+                    </div>
+                    <span class="stat-bar-value">@((item.Percent * 100).ToString("0"))%</span>
+                </div>
+            }
+        </div>
+
+        <div class="table-card stat-bars">
+            <h5>Strikes by Target</h5>
+            @foreach (var item in Model.StrikeTargetBreakdown)
+            {
+                <div class="stat-bar-row">
+                    <span class="stat-bar-label">@item.Label</span>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" style="width: @((item.Percent * 100).ToString("0.##"))%"></div>
+                    </div>
+                    <span class="stat-bar-value">@((item.Percent * 100).ToString("0"))%</span>
+                </div>
+            }
+        </div>
+
+        <div class="table-card stat-bars">
+            <h5>Win Method</h5>
+            @foreach (var item in Model.WinMethodLegend)
+            {
+                <div class="stat-bar-row">
+                    <span class="stat-bar-label">@item.Label</span>
+                    <div class="stat-bar-track">
+                        <div class="stat-bar-fill" style="width: @((Model.FighterData.RecordWins > 0 ? (double)item.Value / Model.FighterData.RecordWins!.Value * 100 : 0).ToString("0.##"))%"></div>
+                    </div>
+                    <span class="stat-bar-value">@item.Value</span>
+                </div>
+            }
+        </div>
+    </div>
+}

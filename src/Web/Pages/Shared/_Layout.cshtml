@@ -6,37 +6,54 @@
     <title>@ViewData["Title"] — MMA Stats</title>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/bioelectric/bioelectric-core.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/Web.styles.css" asp-append-version="true" />
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-dark" style="background:#16213e;border-bottom:2px solid #e94560;">
-            <div class="container">
-                <a class="navbar-brand fw-bold text-uppercase" style="letter-spacing:2px;" asp-area="" asp-page="/Index">MMA Stats</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav">
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-page="/Fighters">Fighters</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-page="/Events">Events</a>
-                        </li>
-                    </ul>
+<body class="@(ViewData["HideBackground"] is true ? "flat-bg" : "")">
+    @if (ViewData["HideBackground"] is not true)
+    {
+        <div class="bioelectric">
+            <canvas id="bioelectric-canvas"></canvas>
+            <div class="noise-overlay"></div>
+            <div class="vignette"></div>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6.0.4"></script>
+        <script src="~/lib/bioelectric/bioelectric-core.js"></script>
+        <script>
+          createBioElectricAnimation(document.getElementById('bioelectric-canvas'));
+        </script>
+    }
+    @if (ViewData["HideNav"] is not true)
+    {
+        <header>
+            <nav class="navbar navbar-expand-sm navbar-dark">
+                <div class="container">
+                    <a class="navbar-brand fw-bold text-uppercase" style="letter-spacing:2px;" asp-area="" asp-page="/Index">MMA Stats</a>
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                    <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
+                        <ul class="navbar-nav">
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Fighters">Fighters</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/Events">Events</a>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
-            </div>
-        </nav>
-    </header>
+            </nav>
+        </header>
+    }
     <div class="container">
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
     </div>
 
-    <footer class="border-top footer text-muted" style="border-color:#e94560 !important;">
+    <footer class="border-top footer">
         <div class="container text-center py-3">
             &copy; 2026 MMA Stats
         </div>

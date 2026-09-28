@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -10,9 +11,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Scraper.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260719155214_AddFighterStats")]
+    partial class AddFighterStats
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -20,180 +23,6 @@ namespace Scraper.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("Bout", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("BoutOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("CardSection")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("CardSectionOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("EventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Fighter1Corner")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("Fighter1Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Fighter1Name")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Fighter1Outcome")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Fighter1Slug")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Fighter2Corner")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("Fighter2Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Fighter2Name")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Fighter2Outcome")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Fighter2Slug")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsCancelled")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Method")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("ResultRound")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ResultTime")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("TitleBout")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("WeightClass")
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("WinnerFighterId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EventId");
-
-                    b.HasIndex("Fighter1Id");
-
-                    b.HasIndex("Fighter2Id");
-
-                    b.HasIndex("WinnerFighterId");
-
-                    b.ToTable("Bouts");
-                });
-
-            modelBuilder.Entity("BoutFighterStats", b =>
-                {
-                    b.Property<string>("Id")
-                        .HasColumnType("text");
-
-                    b.Property<int>("BodyAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("BodyLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("BoutId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("ClinchAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ClinchLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ControlTime")
-                        .HasColumnType("text");
-
-                    b.Property<int>("DistanceAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("DistanceLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid?>("FighterId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("FighterSlug")
-                        .HasColumnType("text");
-
-                    b.Property<int>("GroundAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("GroundLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("HeadAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("HeadLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Knockdowns")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LegAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("LegLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Reversals")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SigStrikesAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SigStrikesLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("SubmissionAttempts")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TakedownsAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TakedownsLanded")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalStrikesAttempted")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TotalStrikesLanded")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BoutId");
-
-                    b.HasIndex("FighterId");
-
-                    b.ToTable("BoutFighterStats");
-                });
 
             modelBuilder.Entity("Event", b =>
                 {
@@ -401,9 +230,6 @@ namespace Scraper.Migrations
                         .HasColumnType("text")
                         .HasJsonPropertyName("profileUrl");
 
-                    b.Property<int?>("Rank")
-                        .HasColumnType("integer");
-
                     b.Property<string>("RawJson")
                         .HasColumnType("jsonb");
 
@@ -554,44 +380,6 @@ namespace Scraper.Migrations
                     b.HasKey("FighterId");
 
                     b.ToTable("FighterStats");
-                });
-
-            modelBuilder.Entity("Bout", b =>
-                {
-                    b.HasOne("Event", null)
-                        .WithMany()
-                        .HasForeignKey("EventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Fighter", null)
-                        .WithMany()
-                        .HasForeignKey("Fighter1Id")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Fighter", null)
-                        .WithMany()
-                        .HasForeignKey("Fighter2Id")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Fighter", null)
-                        .WithMany()
-                        .HasForeignKey("WinnerFighterId")
-                        .OnDelete(DeleteBehavior.SetNull);
-                });
-
-            modelBuilder.Entity("BoutFighterStats", b =>
-                {
-                    b.HasOne("Bout", null)
-                        .WithMany()
-                        .HasForeignKey("BoutId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Fighter", null)
-                        .WithMany()
-                        .HasForeignKey("FighterId")
-                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FighterHeroStat", b =>

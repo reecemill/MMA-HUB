@@ -2,6 +2,7 @@
 @model IndexModel
 @{
     ViewData["Title"] = "Home";
+    ViewData["HideNav"] = true;
 }
 
 <div class="hero">
@@ -9,18 +10,29 @@
     <p class="sub">UFC fighter data, events &amp; predictions</p>
 </div>
 
+@if (Model.NextEvent != null)
+{
+    <div class="card text-center next-event">
+        <h5>Next Event</h5>
+        <div class="next-event-title">@Model.NextEvent.Title</div>
+        <div class="next-event-date">@Model.NextEvent.EventDate?.ToString("MMM dd, yyyy")</div>
+        @if (!string.IsNullOrWhiteSpace(Model.NextEvent.Venue))
+        {
+            <div class="next-event-venue">@Model.NextEvent.Venue</div>
+        }
+    </div>
+}
+
 <div class="row g-4">
     <div class="col-md-6">
         <div class="card text-center">
             <h5>Fighters</h5>
-            <div class="count">@Model.FighterCount</div>
             <a asp-page="/Fighters" class="btn btn-primary">Browse Fighters</a>
         </div>
     </div>
     <div class="col-md-6">
         <div class="card text-center">
             <h5>Events</h5>
-            <div class="count">@Model.EventCount</div>
             <a asp-page="/Events" class="btn btn-primary">Browse Events</a>
         </div>
     </div>

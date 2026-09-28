@@ -1,0 +1,207 @@
+/**
+ * BioElectric Hero Background - Shared Styles
+ * Core visual elements and hero content styling.
+ */
+
+/* ==========================================================================
+   Core Animation Container
+   ========================================================================== */
+
+.bioelectric {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #020608;
+}
+
+.bioelectric canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.bioelectric .noise-overlay {
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+.bioelectric .vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(2,6,8,0.5) 100%);
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Hero Page Layout
+   ========================================================================== */
+
+.bioelectric-page {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Inter', -apple-system, sans-serif;
+  overflow: hidden;
+  background: #020608;
+}
+
+.bioelectric-page *,
+.bioelectric-page *::before,
+.bioelectric-page *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.bioelectric-hero {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   Hero Content
+   ========================================================================== */
+
+.bioelectric-content {
+  position: relative;
+  z-index: 10;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 8vw;
+  max-width: 56.25rem; /* 900px */
+}
+
+.bioelectric-kicker {
+  font-size: clamp(0.625rem, 1.2vw, 0.8125rem); /* 10-13px */
+  font-weight: 500;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #14b8a6;
+  margin-bottom: 1.5rem;
+  opacity: 0;
+  animation: bioelectric-fadeSlideUp 0.8s ease-out 0.3s forwards;
+}
+
+.bioelectric-headline {
+  font-size: clamp(2rem, 6vw, 4.25rem); /* 32-68px */
+  font-weight: 300;
+  line-height: 1.1;
+  color: #f0fdfa;
+  letter-spacing: -0.02em;
+  opacity: 0;
+  animation: bioelectric-fadeSlideUp 0.8s ease-out 0.5s forwards;
+}
+
+.bioelectric-headline-gradient {
+  display: block;
+  background: linear-gradient(135deg, #14b8a6 0%, #38bdf8 50%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bioelectric-subhead {
+  font-size: clamp(0.9375rem, 1.8vw, 1.1875rem); /* 15-19px */
+  font-weight: 400;
+  line-height: 1.6;
+  color: rgba(224, 242, 254, 0.7);
+  margin-top: 2rem;
+  max-width: 33.75rem; /* 540px */
+  opacity: 0;
+  animation: bioelectric-fadeSlideUp 0.8s ease-out 0.7s forwards;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.bioelectric-cta-group {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  opacity: 0;
+  animation: bioelectric-fadeSlideUp 0.8s ease-out 0.9s forwards;
+}
+
+.bioelectric-btn-primary {
+  padding: 1rem 2rem;
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  border: none;
+  border-radius: 0.125rem; /* 2px */
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  color: #021a14;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 1.875rem rgba(20, 184, 166, 0.3); /* 30px */
+}
+
+.bioelectric-btn-primary:hover {
+  transform: translateY(-0.125rem); /* -2px */
+  box-shadow: 0 0 2.5rem rgba(20, 184, 166, 0.5); /* 40px */
+}
+
+.bioelectric-btn-secondary {
+  padding: 1rem 2rem;
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(20, 184, 166, 0.4);
+  border-radius: 0.125rem; /* 2px */
+  background: transparent;
+  color: #5eead4;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bioelectric-btn-secondary:hover {
+  border-color: rgba(20, 184, 166, 0.8);
+  background: rgba(20, 184, 166, 0.1);
+}
+
+/* ==========================================================================
+   Animations
+   ========================================================================== */
+
+@keyframes bioelectric-fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(1.875rem); /* 30px */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 37.5rem) { /* 600px */
+  .bioelectric-content {
+    padding: 0 6vw;
+  }
+  .bioelectric-cta-group {
+    flex-direction: column;
+  }
+  .bioelectric-btn-primary,
+  .bioelectric-btn-secondary {
+    width: 100%;
+    text-align: center;
+  }
+}

@@ -8,8 +8,7 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
 
-    public int FighterCount { get; set; }
-    public int EventCount { get; set; }
+    public Event? NextEvent { get; set; }
 
     public IndexModel(AppDbContext db)
     {
@@ -18,7 +17,9 @@ public class IndexModel : PageModel
 
     public async Task OnGetAsync()
     {
-        FighterCount = await _db.Fighters.CountAsync();
-        EventCount = await _db.Events.CountAsync();
+        NextEvent = await _db.Events
+            .Where(e => e.EventDate != null && e.EventDate > DateTime.UtcNow && e.Status == "scheduled")
+            .OrderBy(e => e.EventDate)
+            .FirstOrDefaultAsync();
     }
 }

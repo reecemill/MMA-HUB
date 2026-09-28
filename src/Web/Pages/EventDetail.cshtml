@@ -1,0 +1,79 @@
+@page "{slug}"
+@model Web.Pages.EventDetailModel
+@{
+    ViewData["Title"] = Model.EventData.Title ?? "Event";
+    ViewData["HideBackground"] = true;
+}
+
+<a asp-page="/Events" class="back-link">&larr; Back to Events</a>
+
+<div class="fighter-header">
+    <h1>@Model.EventData.Title</h1>
+    <p class="fighter-meta">
+        @(Model.EventData.EventDate?.ToString("MMM dd, yyyy") ?? Model.EventData.EventDateLabel ?? "-")
+        @if (!string.IsNullOrWhiteSpace(Model.EventData.Venue))
+        {
+            <text>&middot; @Model.EventData.Venue</text>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.EventData.LocationText ?? Model.EventData.City))
+        {
+            <text>&middot; @(Model.EventData.LocationText ?? Model.EventData.City)</text>
+        }
+    </p>
+</div>
+
+@if (Model.BoutsBySection.Count == 0)
+{
+    <p class="fighter-meta">No fight card data available for this event yet.</p>
+}
+
+@foreach (var cardSection in Model.BoutsBySection)
+{
+    <h2 class="stats-section-title">@cardSection.Key</h2>
+    <div class="table-card section-card">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Weight Class</th>
+                    <th>Matchup</th>
+                    <th>Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var bout in cardSection)
+                {
+                    <tr>
+                        <td>
+                            @bout.WeightClass
+                            @if (bout.TitleBout)
+                            {
+                                <span class="champion-badge">Title</span>
+                            }
+                        </td>
+                        <td>
+                            <a asp-page="/BoutDetail" asp-route-id="@bout.Id" asp-route-eventSlug="@Model.EventData.Slug" class="fighter-link">
+                                <span class="@(bout.Fighter1Outcome == "win" ? "bout-winner" : "")">@(bout.Fighter1Name ?? bout.Fighter1?.Name ?? "TBD")</span>
+                                vs
+                                <span class="@(bout.Fighter2Outcome == "win" ? "bout-winner" : "")">@(bout.Fighter2Name ?? bout.Fighter2?.Name ?? "TBD")</span>
+                            </a>
+                        </td>
+                        <td>
+                            @if (bout.IsCancelled)
+                            {
+                                <text>Cancelled</text>
+                            }
+                            else if (bout.Status == "completed")
+                            {
+                                @bout.Method @(bout.ResultRound != null ? $"(R{bout.ResultRound})" : "")
+                            }
+                            else
+                            {
+                                <text>Upcoming</text>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

@@ -2,30 +2,75 @@
 @model Web.Pages.FightersModel
 @{
     ViewData["Title"] = "Fighters";
+    ViewData["HideBackground"] = true;
 }
 
 <h1>Fighters</h1>
 
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Name</th>
-            <th>Nickname</th>
-            <th>Division</th>
-            <th>Record</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var fighter in Model.Fighters)
-        {
+<form method="get" class="fighter-search">
+    <input type="text" name="search" value="@Model.SearchTerm" placeholder="Search fighters by name..." />
+    @if (!string.IsNullOrWhiteSpace(Model.SelectedDivision))
+    {
+        <input type="hidden" name="division" value="@Model.SelectedDivision" />
+    }
+    @if (Model.SelectedStatus == "all")
+    {
+        <input type="hidden" name="status" value="all" />
+    }
+    <button type="submit" class="btn btn-primary">Search</button>
+</form>
+
+<div class="division-tabs">
+    <a class="tab @(Model.SelectedStatus == "active" ? "active" : "")"
+       href="@Url.Page("Fighters", new { division = Model.SelectedDivision, search = Model.SearchTerm, status = "active" })">Active</a>
+    <a class="tab @(Model.SelectedStatus == "all" ? "active" : "")"
+       href="@Url.Page("Fighters", new { division = Model.SelectedDivision, search = Model.SearchTerm, status = "all" })">All</a>
+</div>
+
+<div class="division-tabs">
+    <a class="tab @(Model.SelectedDivision is null ? "active" : "")"
+       href="@Url.Page("Fighters", new { search = Model.SearchTerm, status = Model.SelectedStatus })">All Divisions</a>
+    @foreach (var division in Model.Divisions)
+    {
+        <a class="tab @(Model.SelectedDivision == division ? "active" : "")"
+           href="@Url.Page("Fighters", new { division, search = Model.SearchTerm, status = Model.SelectedStatus })">@division</a>
+    }
+</div>
+
+<div class="table-card">
+    <table class="table">
+        <thead>
             <tr>
-                <td>@fighter.Name</td>
-                <td>@fighter.Nickname</td>
-                <td>@fighter.Division</td>
-                <td>@fighter.RecordText</td>
-                <td>@(fighter.IsActive ? "Active" : "Inactive")</td>
+                <th>Name</th>
+                <th>Nickname</th>
+                <th>Division</th>
+                <th>Record</th>
+                <th>Status</th>
             </tr>
-        }
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            @foreach (var fighter in Model.Fighters)
+            {
+                <tr>
+                    <td>
+                        <a asp-page="/FighterDetail" asp-route-slug="@fighter.Slug" class="fighter-link">
+                            @if (fighter.ChampionStatus == "champion")
+                            {
+                                <span class="rank-badge">C</span>
+                            }
+                            else if (fighter.Rank != null)
+                            {
+                                <span class="rank-badge">#@fighter.Rank</span>
+                            }
+                            @fighter.Name
+                        </a>
+                    </td>
+                    <td>@fighter.Nickname</td>
+                    <td>@fighter.Division</td>
+                    <td>@fighter.RecordText</td>
+                    <td>@(fighter.IsActive ? "Active" : "Inactive")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
