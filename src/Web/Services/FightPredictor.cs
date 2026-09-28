@@ -16,9 +16,12 @@ public class FightPredictor
         ("Elo rating", ["elo"]),
         ("Record and form", ["win_pct", "last3", "streak"]),
         ("Finishing", ["ko_rate", "sub_rate", "finished_rate"]),
+        ("Striking", ["slpm", "sapm", "str_acc", "str_def", "kd15", "strike_matchup"]),
+        ("Grappling", ["td15", "td_acc", "td_def", "ctrl", "sub15", "grapple_matchup"]),
         ("UFC experience", ["log_fights"]),
         ("Time since last fight", ["log_layoff"]),
-        ("Physical", ["age", "height", "reach", "southpaw"]),
+        ("Age", ["age"]),
+        ("Physical", ["height", "reach", "southpaw"]),
     ];
 
     public ModelInfo Model { get; }
@@ -65,6 +68,10 @@ public class FightPredictor
     private Dictionary<string, double> Features(FighterProfile p, DateTime date)
     {
         double layoffDays = p.LastFight.HasValue ? Math.Max((date - p.LastFight.Value).TotalDays, 0) : 0;
+        // Age from the date of birth when it's known; UFC.com's age is stale for retired fighters.
+        double age = p.Birth.HasValue
+            ? (date.Date - p.Birth.Value.Date).Days / 365.25
+            : p.AgeRef - (SnapshotDate - date).TotalDays / 365.25;
         return new Dictionary<string, double>
         {
             ["elo"] = p.Elo,
@@ -76,17 +83,38 @@ public class FightPredictor
             ["sub_rate"] = p.SubRate,
             ["finished_rate"] = p.FinishedRate,
             ["log_layoff"] = Math.Log(1 + layoffDays),
-            ["age"] = p.AgeRef - (SnapshotDate - date).TotalDays / 365.25,
+            ["age"] = age,
             ["height"] = p.Height,
             ["reach"] = p.Reach,
             ["southpaw"] = p.Southpaw,
+            ["slpm"] = p.Slpm,
+            ["sapm"] = p.Sapm,
+            ["str_acc"] = p.StrAcc,
+            ["str_def"] = p.StrDef,
+            ["kd15"] = p.Kd15,
+            ["td15"] = p.Td15,
+            ["td_acc"] = p.TdAcc,
+            ["td_def"] = p.TdDef,
+            ["ctrl"] = p.Ctrl,
+            ["sub15"] = p.Sub15,
         };
+    }
+
+    // Fighter A's features minus fighter B's, plus the matchup terms (A's attack against
+    // B's defense, minus the reverse), exactly as pair_features in ml/train.py.
+    private static Dictionary<string, double> Differences(Dictionary<string, double> a, Dictionary<string, double> b)
+    {
+        Dictionary<string, double> d = a.Keys.ToDictionary(k => k, k => a[k] - b[k]);
+        d["strike_matchup"] = a["slpm"] * (1 - b["str_def"]) - b["slpm"] * (1 - a["str_def"]);
+        d["grapple_matchup"] = a["td15"] * (1 - b["td_def"]) - b["td15"] * (1 - a["td_def"]);
+        return d;
     }
 
     private Prediction Predict(Dictionary<string, double> a, Dictionary<string, double> b)
     {
+        Dictionary<string, double> d = Differences(a, b);
         Dictionary<string, double> contributions = Model.Features.ToDictionary(
-            f => f.Key, f => f.Weight * (a[f.Key] - b[f.Key]) / f.Scale);
+            f => f.Key, f => f.Weight * d[f.Key] / f.Scale);
         double logit = contributions.Values.Sum();
 
         List<Reason> reasons = ReasonGroups
@@ -121,6 +149,19 @@ public class FighterProfile
     public double Reach { get; set; }
     public double Southpaw { get; set; }
     public double AgeRef { get; set; }
+    public DateTime? Birth { get; set; }
+    // Rates over earlier UFC fights with ufcstats.com stats, pulled toward the league
+    // average for fighters with little fight time (see FighterHistory.state in ml/train.py).
+    public double Slpm { get; set; }
+    public double Sapm { get; set; }
+    [JsonPropertyName("str_acc")] public double StrAcc { get; set; }
+    [JsonPropertyName("str_def")] public double StrDef { get; set; }
+    public double Kd15 { get; set; }
+    public double Td15 { get; set; }
+    [JsonPropertyName("td_acc")] public double TdAcc { get; set; }
+    [JsonPropertyName("td_def")] public double TdDef { get; set; }
+    public double Ctrl { get; set; }
+    public double Sub15 { get; set; }
     public int Fights { get; set; }
     public int Wins { get; set; }
     public int Losses { get; set; }
@@ -158,8 +199,13 @@ public class TestResults
     public DateTime From { get; set; }
     public DateTime To { get; set; }
     public Score Model { get; set; } = new();
+    [JsonPropertyName("before_fight_stats")] public Score BeforeFightStats { get; set; } = new();
     [JsonPropertyName("elo_only")] public Score EloOnly { get; set; } = new();
     [JsonPropertyName("better_win_rate")] public Score BetterWinRate { get; set; } = new();
+    // Each model family's pick on the validation years, scored on the test years.
+    public Dictionary<string, Score> Families { get; set; } = [];
+    // New minus old per metric, as [mean, low, high] of a 95% paired-bootstrap interval.
+    public Dictionary<string, Dictionary<string, double[]>> Comparisons { get; set; } = [];
     public List<CalibrationBucket> Calibration { get; set; } = [];
 }
 

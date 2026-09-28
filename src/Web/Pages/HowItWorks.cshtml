@@ -4,12 +4,16 @@
     ViewData["Title"] = "How the Predictions Work";
     ViewData["HideBackground"] = true;
     var test = Model.Info.Test;
+    var gain = Model.Comparison("vs before fight stats", "accuracy");
+    var overRule = Model.Comparison("vs better win rate", "accuracy");
+    var others = test.Families.Keys.Where(f => f != "logistic regression").ToList();
+    bool anotherIsBetter = others.Any(f => Model.Comparison($"{f} vs logistic regression", "log_loss") is { } c && c[2] < 0);
 }
 
 <article class="prose">
     <div class="fighter-header">
         <h1>How the predictions work</h1>
-        <p class="fighter-meta">A logistic regression on each fighter's UFC history, tested on fights it never saw.</p>
+        <p class="fighter-meta">A logistic regression on each fighter's UFC record and fight stats, tested on fights it never saw.</p>
     </div>
 
     <h2 class="stats-section-title">How well it does</h2>
@@ -23,17 +27,35 @@
             <thead><tr><th>Method</th><th>Picks the winner</th><th>Log loss</th></tr></thead>
             <tbody>
                 <tr><td><strong>This model</strong></td><td><strong>@HowItWorksModel.Percent(test.Model.Accuracy)</strong></td><td><strong>@test.Model.LogLoss?.ToString("0.000")</strong></td></tr>
+                <tr><td>The model before fight stats (record, Elo, and finishing)</td><td>@HowItWorksModel.Percent(test.BeforeFightStats.Accuracy)</td><td>@test.BeforeFightStats.LogLoss?.ToString("0.000")</td></tr>
                 <tr><td>Whoever has the better UFC win rate</td><td>@HowItWorksModel.Percent(test.BetterWinRate.Accuracy)</td><td>&ndash;</td></tr>
                 <tr><td>Whoever has the higher Elo rating</td><td>@HowItWorksModel.Percent(test.EloOnly.Accuracy)</td><td>@test.EloOnly.LogLoss?.ToString("0.000")</td></tr>
                 <tr><td>Coin flip</td><td>50.0%</td><td>0.693</td></tr>
             </tbody>
         </table>
     </div>
+    @if (gain != null && overRule != null)
+    {
+        <p>
+            Adding each fighter's striking and grappling history made the difference. The model picks
+            @HowItWorksModel.Points(gain[0]) percentage points more winners than it did before
+            (95% interval @HowItWorksModel.Points(gain[1]) to @HowItWorksModel.Points(gain[2])), and
+            @HowItWorksModel.Points(overRule[0]) points more than simply backing the fighter with the better record
+            (@HowItWorksModel.Points(overRule[1]) to @HowItWorksModel.Points(overRule[2])).
+            @(gain[1] > 0 && overRule[1] > 0
+                ? "Both gains are bigger than chance could produce on this many fights."
+                : gain[1] > 0
+                    ? "The gain over the old model is bigger than chance; the edge over the simple rule is within what chance could produce on this many fights."
+                    : "Neither gain is bigger than what chance could produce on this many fights.")
+        </p>
+    }
     <p>
-        On picking winners alone, the model is no better than choosing the fighter with the better UFC
-        record: MMA is hard to predict from records, and most of what they say is in the win rate. Where the model adds
-        something is the probability. Log loss rewards being confident when right and punishes being confident when wrong
-        (lower is better), and the model has the best score. Its percentages mean what they say:
+        Log loss rewards being confident when right and punishes being confident when wrong (lower is better).
+        @(Model.CalibrationGap > 0.015
+            ? "The percentages are a little cautious: the favorite wins somewhat more often than the model says."
+            : Model.CalibrationGap < -0.015
+                ? "The percentages are a little bold: the favorite wins somewhat less often than the model says."
+                : "The percentages mean what they say:")
     </p>
     <div class="table-card section-card calibration">
         @foreach (var bucket in test.Calibration)
@@ -56,6 +78,15 @@
         <li><strong>Record and form</strong>: UFC win rate, the last three results, and the current win or losing streak.</li>
         <li><strong>Finishing</strong>: knockouts and submissions per fight, and how often the fighter has been finished.</li>
         <li>
+            <strong>Striking</strong>: significant strikes landed and absorbed per minute, striking accuracy and defense,
+            and knockdowns per 15 minutes.
+        </li>
+        <li>
+            <strong>Grappling</strong>: takedowns per 15 minutes, takedown accuracy and defense, time spent in control
+            minus time controlled, and submission attempts.
+        </li>
+        <li><strong>Age</strong> on the day of the fight. Other things equal, the younger fighter is favored.</li>
+        <li>
             <strong>UFC experience</strong>: number of UFC fights. Once record is accounted for, more fights counts slightly
             <em>against</em> a fighter, probably because long careers mean older fighters.
         </li>
@@ -65,24 +96,70 @@
         </li>
     </ul>
     <p>
-        Fighters making their UFC debut have no history, so they're treated as average. Dream fights use each fighter as of
-        their last UFC fight.
+        The striking and grappling numbers are built fight by fight from
+        <a href="https://github.com/Greco1899/scrape_ufc_stats">a public export of ufcstats.com's per-fight stats</a>,
+        so each prediction only sees the fights that came before it. A fighter with little UFC fight time is pulled toward
+        the league average until there's enough to go on, and fighters making their UFC debut are treated as average.
+        Dream fights use each fighter as of their last UFC fight.
+    </p>
+
+    <h2 class="stats-section-title">Three kinds of model</h2>
+    <p>
+        A gradient-boosted tree model and a small neural network were given the same fights and features, and chosen and
+        tested the same way:
+    </p>
+    <div class="table-card section-card">
+        <table class="table">
+            <thead><tr><th>Model</th><th>Picks the winner</th><th>Log loss</th></tr></thead>
+            <tbody>
+                @foreach (var (family, score) in test.Families)
+                {
+                    <tr><td>@(char.ToUpper(family[0]) + family[1..])</td><td>@HowItWorksModel.Percent(score.Accuracy)</td><td>@score.LogLoss?.ToString("0.000")</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p>
+        @{
+            var verdicts = others
+                .Select(f => (Family: f, Interval: Model.Comparison($"{f} vs logistic regression", "log_loss")))
+                .Where(v => v.Interval != null)
+                .Select(v => (v.Family, Verdict: HowItWorksModel.LogLossVerdict(v.Interval!)))
+                .ToList();
+        }
+        @if (verdicts.Count > 1 && verdicts.All(v => v.Verdict == verdicts[0].Verdict))
+        {
+            <text>On log loss, both were @verdicts[0].Verdict the logistic regression. </text>
+        }
+        else
+        {
+            foreach (var v in verdicts)
+            {
+                <text>On log loss, @v.Family was @v.Verdict the logistic regression. </text>
+            }
+        }
+        @(anotherIsBetter
+            ? "The site still uses the logistic regression for now, because its reasons for each pick can be shown exactly."
+            : "Neither did better, so the site uses the logistic regression, whose reasons for each pick can be shown exactly. With a few thousand fights to learn from, the extra flexibility probably has too little to work with.")
     </p>
 
     <h2 class="stats-section-title">What was tried and left out</h2>
     <ul>
         <li>
-            <strong>Height, reach, age, and stance</strong> made predictions worse on the years held out for choosing the model.
-            The data is the likely reason: ages stopped updating on UFC.com for many retired fighters, and many reaches are missing.
+            <strong>Height, reach, and stance</strong> made predictions worse on the years held out for choosing the model.
+            Many reaches are missing from the data.
         </li>
         <li>
-            <strong>Career stats</strong> such as strikes landed per minute are current totals that include the very fights being
-            predicted, so using them would leak the results.
+            <strong>Matchup terms</strong>, one fighter's striking or takedowns against the other's defense, didn't help either,
+            probably because the individual stats already carry most of that information.
         </li>
-        <li><strong>Gradient boosting</strong> did no better than the logistic regression, which is easier to explain.</li>
+        <li>
+            <strong>UFC.com's career stats</strong>, such as strikes landed per minute, are current totals that include the
+            very fights being predicted, so using them would leak the results. The model rebuilds them fight by fight instead.
+        </li>
         <li>
             <strong>Betting odds</strong> aren't used. Odds reflect things no record shows, like injuries and short-notice
-            replacements, so a bookmaker's favorite is a stronger pick than this model's.
+            replacements, so a bookmaker's favorite is still a stronger pick than this model's.
         </li>
     </ul>
 

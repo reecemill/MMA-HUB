@@ -69,9 +69,9 @@ else
             <span class="side-b" style="width: @percentB%"></span>
         </div>
         <p class="matchup-caption">
-            Each fighter as of their last UFC fight. The model only knows UFC results, not
-            styles, so this is for fun: on real fights it hadn't seen, its favorite won
-            @((Predictor.Model.Test.Model.Accuracy * 100).ToString("0"))% of the time.
+            Each fighter as of their last UFC fight. The model knows their UFC results and fight
+            stats, not how two styles would really play out, so this is for fun: on real fights it
+            hadn't seen, its favorite won @((Predictor.Model.Test.Model.Accuracy * 100).ToString("0"))% of the time.
         </p>
     </div>
 
@@ -118,5 +118,5 @@ else
             </tbody>
         </table>
     </div>
-    <p class="reasons-note">* Shown for context. The model leaves physical stats out: they made its predictions worse on fights it hadn't seen.</p>
+    <p class="reasons-note">* Shown for context. The model leaves height, reach, and stance out: they made its predictions worse on fights it hadn't seen.</p>
 }

@@ -3,67 +3,139 @@
   "snapshotDate": "2026-07-18",
   "trainingBouts": 8591,
   "eloK": 128,
-  "featureSet": "record + finishing + layoff",
+  "featureSet": "+ striking + grappling + age",
   "features": [
     {
       "key": "elo",
       "label": "Elo rating",
       "scale": 107.00807706179006,
-      "weight": 0.29961011870020093
+      "weight": 0.34238231289702414
     },
     {
       "key": "win_pct",
       "label": "UFC win rate",
       "scale": 0.1536883401801693,
-      "weight": 0.08903306947589654
+      "weight": -0.1552481650836324
     },
     {
       "key": "log_fights",
       "label": "UFC experience",
       "scale": 0.9789147105327027,
-      "weight": -0.12446646890830122
+      "weight": -0.07346821406568976
     },
     {
       "key": "last3",
       "label": "Recent form (last 3)",
       "scale": 0.1837360833315199,
-      "weight": -0.09486584499641913
+      "weight": -0.11124647608554661
     },
     {
       "key": "streak",
       "label": "Current streak",
       "scale": 2.1043104461392215,
-      "weight": 0.07927422265549583
+      "weight": 0.03926578263687184
     },
     {
       "key": "ko_rate",
       "label": "KO/TKO wins per fight",
       "scale": 0.21488966133475793,
-      "weight": 0.07685857597642856
+      "weight": 0.1417165018812875
     },
     {
       "key": "sub_rate",
       "label": "Submission wins per fight",
       "scale": 0.18805430787680608,
-      "weight": 0.06195259200849584
+      "weight": 0.1331738032744034
     },
     {
       "key": "finished_rate",
       "label": "Times finished per fight",
       "scale": 0.21011220045890627,
-      "weight": -0.07372063673779862
+      "weight": -0.10318139528880675
     },
     {
       "key": "log_layoff",
       "label": "Time since last fight",
       "scale": 2.399541740397581,
-      "weight": 0.1339512600435455
+      "weight": 0.1174824598369
+    },
+    {
+      "key": "slpm",
+      "label": "Strikes landed per minute",
+      "scale": 1.1748900805693878,
+      "weight": 0.16922820806975958
+    },
+    {
+      "key": "sapm",
+      "label": "Strikes absorbed per minute",
+      "scale": 1.1223544854836036,
+      "weight": -0.23240290397165567
+    },
+    {
+      "key": "str_acc",
+      "label": "Striking accuracy",
+      "scale": 0.10079019287993676,
+      "weight": 0.06649292084269634
+    },
+    {
+      "key": "str_def",
+      "label": "Striking defense",
+      "scale": 0.09768137660544812,
+      "weight": 0.11472451072111965
+    },
+    {
+      "key": "kd15",
+      "label": "Knockdowns per 15 minutes",
+      "scale": 0.47532039621828776,
+      "weight": -0.01776801061864233
+    },
+    {
+      "key": "td15",
+      "label": "Takedowns per 15 minutes",
+      "scale": 1.304094594968032,
+      "weight": 0.15461524093004847
+    },
+    {
+      "key": "td_acc",
+      "label": "Takedown accuracy",
+      "scale": 0.14431458853452708,
+      "weight": -0.04268596781843947
+    },
+    {
+      "key": "td_def",
+      "label": "Takedown defense",
+      "scale": 0.1576726759076863,
+      "weight": 0.06876504276345857
+    },
+    {
+      "key": "ctrl",
+      "label": "Net control time",
+      "scale": 0.2030962226059164,
+      "weight": 0.02738406487421249
+    },
+    {
+      "key": "sub15",
+      "label": "Submission attempts per 15 minutes",
+      "scale": 0.7981455661869881,
+      "weight": -0.005954408091564186
+    },
+    {
+      "key": "age",
+      "label": "Age",
+      "scale": 5.887892195051114,
+      "weight": -0.21841264475578478
     }
   ],
   "test": {
     "from": "2024-01-01",
     "to": "2026-07-18",
     "model": {
+      "accuracy": 0.6361538461538462,
+      "log_loss": 0.6405826461505251,
+      "brier": 0.22482452813064982,
+      "bouts": 1300
+    },
+    "before_fight_stats": {
       "accuracy": 0.5984615384615385,
       "log_loss": 0.6651939558201548,
       "brier": 0.23641212126234185,
@@ -79,34 +151,99 @@
       "accuracy": 0.6023076923076923,
       "bouts": 1300
     },
+    "families": {
+      "logistic regression": {
+        "accuracy": 0.6361538461538462,
+        "log_loss": 0.6405826461505251,
+        "brier": 0.22482452813064982,
+        "bouts": 1300
+      },
+      "gradient boosting": {
+        "accuracy": 0.6215384615384615,
+        "log_loss": 0.6436585317267925,
+        "brier": 0.22609134640587505,
+        "bouts": 1300
+      },
+      "neural network": {
+        "accuracy": 0.6269230769230769,
+        "log_loss": 0.6398712318634101,
+        "brier": 0.2246349609504079,
+        "bouts": 1300
+      }
+    },
+    "comparisons": {
+      "vs before fight stats": {
+        "accuracy": [
+          0.03769230769230769,
+          0.011538461538461608,
+          0.06384615384615377
+        ],
+        "log_loss": [
+          -0.024611309669629766,
+          -0.03349563861418685,
+          -0.01599061186387213
+        ]
+      },
+      "vs better win rate": {
+        "accuracy": [
+          0.03384615384615386,
+          0.0038461538461538325,
+          0.0615576923076922
+        ]
+      },
+      "gradient boosting vs logistic regression": {
+        "accuracy": [
+          -0.014615384615384697,
+          -0.033076923076923004,
+          0.0038461538461538325
+        ],
+        "log_loss": [
+          0.0030758855762674786,
+          -0.0037704813165598513,
+          0.009951298622415714
+        ]
+      },
+      "neural network vs logistic regression": {
+        "accuracy": [
+          -0.009230769230769265,
+          -0.025403846153846214,
+          0.007692307692307665
+        ],
+        "log_loss": [
+          -0.0007114142871149642,
+          -0.005624689385240705,
+          0.004178184006328679
+        ]
+      }
+    },
     "calibration": [
       {
         "from": 0.5,
         "to": 0.6,
-        "bouts": 932,
-        "predicted": 0.5422934134017623,
-        "actual": 0.5633047210300429
+        "bouts": 707,
+        "predicted": 0.5489147606501036,
+        "actual": 0.5742574257425742
       },
       {
         "from": 0.6,
         "to": 0.7,
-        "bouts": 319,
-        "predicted": 0.6384389952288569,
-        "actual": 0.6677115987460815
+        "bouts": 451,
+        "predicted": 0.6434718033829842,
+        "actual": 0.6784922394678492
       },
       {
         "from": 0.7,
         "to": 0.8,
-        "bouts": 44,
-        "predicted": 0.7297751556864391,
-        "actual": 0.8181818181818182
+        "bouts": 124,
+        "predicted": 0.737453845719856,
+        "actual": 0.7983870967741935
       },
       {
         "from": 0.8,
         "to": 1.0,
-        "bouts": 5,
-        "predicted": 0.8116010342741813,
-        "actual": 0.8
+        "bouts": 18,
+        "predicted": 0.8360491269318788,
+        "actual": 0.8888888888888888
       }
     ]
   }

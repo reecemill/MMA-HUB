@@ -13,18 +13,29 @@ One stop shop for all things UFC: every fighter and event since UFC 1, and a mod
 
 ## Prediction model
 
-A logistic regression on each fighter's UFC history before the fight: an Elo rating, win rate, last three results, streak, knockouts and submissions per fight, how often they've been finished, number of UFC fights, and time since their last fight. Everything is computed from fights before the one being predicted, so the model never sees a result it's asked to predict.
+A logistic regression on each fighter's UFC history before the fight:
 
-The settings (feature set and Elo K-factor) were chosen on 2022–2023, then the model was trained on everything before 2024 and tested once on the 1,300 fights from January 2024 to July 2026:
+- **Record**: an Elo rating, win rate, last three results, streak, number of UFC fights, and time since their last fight.
+- **Finishing**: knockouts and submissions per fight, and how often they've been finished.
+- **Striking**: significant strikes landed and absorbed per minute, accuracy, defense, and knockdowns.
+- **Grappling**: takedowns per 15 minutes, takedown accuracy and defense, net control time, and submission attempts.
+- **Age** on the day of the fight, from date of birth.
+
+Everything is computed from fights before the one being predicted, so the model never sees a result it's asked to predict. The striking and grappling rates are built fight by fight from ufcstats.com's per-fight stats (via [a public export](https://github.com/Greco1899/scrape_ufc_stats), matched to 98.9% of bouts), and pulled toward the league average for fighters with little UFC fight time. UFC.com's career stats aren't used, because they're current totals that include the fights being predicted.
+
+The settings (model, feature set, and Elo K-factor) were chosen on 2022–2023, then the model was trained on everything before 2024 and tested once on the 1,300 fights from January 2024 to July 2026:
 
 | Method | Picks the winner | Log loss |
 |---|---|---|
-| This model | 59.8% | 0.665 |
+| This model | 63.6% | 0.641 |
+| The model before per-fight stats (record, Elo, finishing) | 59.8% | 0.665 |
 | Whoever has the better UFC win rate | 60.2% | – |
 | Whoever has the higher Elo rating | 58.2% | 0.676 |
 | Coin flip | 50.0% | 0.693 |
 
-On picking winners the model is no better than the simple win-rate rule. What it adds is a calibrated probability: when it gives the favorite 60–70%, the favorite wins 67% of the time. Height, reach, age, and stance made predictions worse on the validation years and were left out, and gradient boosting did no better.
+Adding striking, grappling, and age picks 3.8 percentage points more winners than the old model (95% paired-bootstrap interval 1.2 to 6.4) and 3.4 more than backing the better record (0.4 to 6.2), with a lower log loss. The probabilities are a little cautious: when it gives the favorite 60–70%, the favorite wins 68% of the time.
+
+Gradient boosting (62.2%, log loss 0.644) and a small neural network (62.7%, 0.640), given the same features and chosen the same way, were both within chance of the logistic regression, so the site keeps the model whose reasons for each pick can be shown exactly. Height, reach, stance, and matchup terms (one fighter's attack against the other's defense) made predictions worse on the validation years and were left out.
 
 ### Data problems found along the way
 
@@ -35,7 +46,8 @@ The first version picked 71% of winners, which was too good to be true. The Cito
 ```
 src/Scraper/   .NET console app: pulls fighters, events, and bouts from the Cito API into Postgres
 src/Web/       ASP.NET Core Razor Pages site
-ml/train.py    trains and tests the model; writes src/Web/Data/*.json for the site
+ml/train.py    compares and tests the models; writes src/Web/Data/*.json for the site
+ml/ufcstats.py per-fight stats from the ufcstats.com export, matched to our bouts
 deploy/        Hugging Face Space setup
 ```
 
@@ -58,11 +70,12 @@ cd ../Web
 dotnet user-secrets set "ConnectionStrings:MmaDb" "Host=localhost;Database=mma;Username=...;Password=..."
 dotnet run                    # http://localhost:5072
 
-# Model: export a snapshot, then train
+# Model: export a snapshot, download the per-fight stats, then train
 dotnet run -- export-sqlite ../../data/mma.db
 cd ../..
 python3 -m venv ml/.venv && ml/.venv/bin/pip install -r ml/requirements.txt
-ml/.venv/bin/python ml/train.py
+ml/.venv/bin/python ml/download_ufcstats.py     # into data/ufcstats/, pinned to a commit of the export
+ml/.venv/bin/python ml/train.py                 # --dry-run: print the comparison without writing files
 ```
 
 ## Public demo
@@ -79,4 +92,4 @@ The data is a snapshot, so "upcoming" means upcoming when it was collected; the 
 
 ## Credits
 
-Data from the [Cito API](https://citoapi.com), which collects it from UFC.com. Not affiliated with the UFC.
+Data from the [Cito API](https://citoapi.com), which collects it from UFC.com. The model's per-fight stats are from [ufcstats.com](http://ufcstats.com), via the CSV export at [Greco1899/scrape_ufc_stats](https://github.com/Greco1899/scrape_ufc_stats); they're downloaded when training and not included here. Not affiliated with the UFC.
