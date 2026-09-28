@@ -1,0 +1,109 @@
+@page
+@model Web.Pages.HowItWorksModel
+@{
+    ViewData["Title"] = "How the Predictions Work";
+    ViewData["HideBackground"] = true;
+    var test = Model.Info.Test;
+}
+
+<article class="prose">
+    <div class="fighter-header">
+        <h1>How the predictions work</h1>
+        <p class="fighter-meta">A logistic regression on each fighter's UFC history, tested on fights it never saw.</p>
+    </div>
+
+    <h2 class="stats-section-title">How well it does</h2>
+    <p>
+        The model was trained on every UFC fight before @test.From.ToString("MMMM yyyy") and then asked to pick
+        the @test.Model.Bouts.ToString("N0") fights from @test.From.ToString("MMM yyyy") to @test.To.ToString("MMM yyyy"),
+        using only what was known the day before each one.
+    </p>
+    <div class="table-card section-card">
+        <table class="table">
+            <thead><tr><th>Method</th><th>Picks the winner</th><th>Log loss</th></tr></thead>
+            <tbody>
+                <tr><td><strong>This model</strong></td><td><strong>@HowItWorksModel.Percent(test.Model.Accuracy)</strong></td><td><strong>@test.Model.LogLoss?.ToString("0.000")</strong></td></tr>
+                <tr><td>Whoever has the better UFC win rate</td><td>@HowItWorksModel.Percent(test.BetterWinRate.Accuracy)</td><td>&ndash;</td></tr>
+                <tr><td>Whoever has the higher Elo rating</td><td>@HowItWorksModel.Percent(test.EloOnly.Accuracy)</td><td>@test.EloOnly.LogLoss?.ToString("0.000")</td></tr>
+                <tr><td>Coin flip</td><td>50.0%</td><td>0.693</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p>
+        On picking winners alone, the model is no better than choosing the fighter with the better UFC
+        record: MMA is hard to predict from records, and most of what they say is in the win rate. Where the model adds
+        something is the probability. Log loss rewards being confident when right and punishes being confident when wrong
+        (lower is better), and the model has the best score. Its percentages mean what they say:
+    </p>
+    <div class="table-card section-card calibration">
+        @foreach (var bucket in test.Calibration)
+        {
+            <div class="calibration-row">
+                <span class="calibration-label">Favorite given @((bucket.From * 100).ToString("0"))&ndash;@((bucket.To * 100).ToString("0"))%</span>
+                <div class="calibration-bars">
+                    <div class="calibration-bar predicted" style="width: @((bucket.Predicted * 100).ToString("0"))%"><span>said @((bucket.Predicted * 100).ToString("0"))%</span></div>
+                    <div class="calibration-bar actual" style="width: @((bucket.Actual * 100).ToString("0"))%"><span>won @((bucket.Actual * 100).ToString("0"))%</span></div>
+                </div>
+                <span class="calibration-count">@bucket.Bouts fights</span>
+            </div>
+        }
+    </div>
+
+    <h2 class="stats-section-title">What goes into a prediction</h2>
+    <p>Everything comes from the two fighters' UFC fights before the one being predicted:</p>
+    <ul>
+        <li><strong>Elo rating</strong>: a rating that rises with wins and falls with losses, by more when the result is an upset.</li>
+        <li><strong>Record and form</strong>: UFC win rate, the last three results, and the current win or losing streak.</li>
+        <li><strong>Finishing</strong>: knockouts and submissions per fight, and how often the fighter has been finished.</li>
+        <li>
+            <strong>UFC experience</strong>: number of UFC fights. Once record is accounted for, more fights counts slightly
+            <em>against</em> a fighter, probably because long careers mean older fighters.
+        </li>
+        <li>
+            <strong>Time since last fight</strong>. A longer gap counts slightly in a fighter's favor, probably because
+            fighters on a quick turnaround are often short-notice replacements.
+        </li>
+    </ul>
+    <p>
+        Fighters making their UFC debut have no history, so they're treated as average. Dream fights use each fighter as of
+        their last UFC fight.
+    </p>
+
+    <h2 class="stats-section-title">What was tried and left out</h2>
+    <ul>
+        <li>
+            <strong>Height, reach, age, and stance</strong> made predictions worse on the years held out for choosing the model.
+            The data is the likely reason: ages stopped updating on UFC.com for many retired fighters, and many reaches are missing.
+        </li>
+        <li>
+            <strong>Career stats</strong> such as strikes landed per minute are current totals that include the very fights being
+            predicted, so using them would leak the results.
+        </li>
+        <li><strong>Gradient boosting</strong> did no better than the logistic regression, which is easier to explain.</li>
+        <li>
+            <strong>Betting odds</strong> aren't used. Odds reflect things no record shows, like injuries and short-notice
+            replacements, so a bookmaker's favorite is a stronger pick than this model's.
+        </li>
+    </ul>
+
+    <h2 class="stats-section-title">Cleaning the data first</h2>
+    <p>
+        The first version of the model picked 71% of winners, which was too good to be true. Duplicates in the data were
+        leaking results:
+    </p>
+    <ul>
+        <li>
+            The API lists most recent events twice under different addresses (for example "UFC 322" and "UFC 322: Della
+            Maddalena vs. Makhachev"), so a fight's own result showed up in the history used to predict its twin. The scraper
+            now marks these, and the site and model skip them.
+        </li>
+        <li>Some fights appear twice on one card, or on an unrelated later card. These are marked the same way.</li>
+    </ul>
+    <p>
+        The API also lists the loser first in almost every fight, which a model could learn instead of anything real, so
+        each fight is used both ways round in training.
+    </p>
+    <p class="fighter-meta">
+        Trained on @Model.Info.TrainingBouts.ToString("N0") fights (@Model.Info.TrainedOn). Elo K-factor @Model.Info.EloK.
+    </p>
+</article>

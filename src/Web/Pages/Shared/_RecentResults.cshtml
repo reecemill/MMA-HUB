@@ -1,0 +1,15 @@
+@model string
+@* Recent results as W/L/D chips, newest first. *@
+@if (string.IsNullOrEmpty(Model))
+{
+    <span>@Web.Format.Missing</span>
+}
+else
+{
+    <span class="recent-results">
+        @foreach (char r in Model)
+        {
+            <span class="result-chip @(r == 'W' ? "win" : r == 'L' ? "loss" : "draw")">@r</span>
+        }
+    </span>
+}

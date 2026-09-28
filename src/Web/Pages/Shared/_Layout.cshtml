@@ -1,4 +1,5 @@
-﻿<!DOCTYPE html>
+﻿@inject Web.Services.FightPredictor Predictor
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -41,6 +42,12 @@
                             <li class="nav-item">
                                 <a class="nav-link" asp-area="" asp-page="/Events">Events</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/DreamFight">Dream Fight</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-page="/HowItWorks">How It Works</a>
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -55,7 +62,9 @@
 
     <footer class="border-top footer">
         <div class="container text-center py-3">
-            &copy; 2026 MMA Stats
+            UFC data from <a href="https://citoapi.com" class="fighter-link">Cito API</a>, results through
+            @Predictor.SnapshotDate.ToString("MMM d, yyyy").
+            Not affiliated with the UFC.
         </div>
     </footer>
 

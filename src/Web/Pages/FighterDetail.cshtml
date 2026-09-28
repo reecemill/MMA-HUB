@@ -15,9 +15,9 @@
         }
         @Model.FighterData.Name
     </h1>
-    @if (!string.IsNullOrWhiteSpace(Model.FighterData.Nickname))
+    @if (Format.Nickname(Model.FighterData.Nickname) is string nickname)
     {
-        <p class="fighter-nickname">"@Model.FighterData.Nickname"</p>
+        <p class="fighter-nickname">@nickname</p>
     }
     <p class="fighter-meta">
         @Model.FighterData.Division
@@ -25,20 +25,65 @@
         {
             <span class="champion-badge">Champion</span>
         }
-        &middot; @(Model.FighterData.IsActive ? "Active" : "Inactive")
+        &middot; @(Model.FighterData.IsActive ? "Active" : Format.Status(Model.FighterData.Status) is var s && s != Format.Missing ? s : "Inactive")
     </p>
+    <a asp-page="/DreamFight" asp-route-a="@Model.FighterData.Slug" class="btn btn-primary btn-sm">Dream fight with @Model.FighterData.Name</a>
 </div>
 
+@* Ages stopped updating on UFC.com for many fighters who aren't active, so only active fighters' ages are shown. *@
 <div class="fighter-bio-grid">
-    <div class="bio-tile"><span class="bio-label">Record</span><span class="bio-value">@(Model.FighterData.RecordText ?? "-")</span></div>
-    <div class="bio-tile"><span class="bio-label">Age</span><span class="bio-value">@(Model.FighterData.Age?.ToString() ?? "-")</span></div>
-    <div class="bio-tile"><span class="bio-label">Height</span><span class="bio-value">@(Model.FighterData.HeightInches ?? "-")"</span></div>
-    <div class="bio-tile"><span class="bio-label">Reach</span><span class="bio-value">@(Model.FighterData.ReachInches ?? "-")"</span></div>
-    <div class="bio-tile"><span class="bio-label">Weight</span><span class="bio-value">@(Model.FighterData.WeightLbs ?? "-") lbs</span></div>
-    <div class="bio-tile"><span class="bio-label">Stance</span><span class="bio-value">@(Model.FighterData.Stance ?? "-")</span></div>
-    <div class="bio-tile"><span class="bio-label">Country</span><span class="bio-value">@(Model.FighterData.Country ?? "-")</span></div>
-    <div class="bio-tile"><span class="bio-label">Fighting Style</span><span class="bio-value">@(Model.FighterData.FightingStyle ?? "-")</span></div>
+    <div class="bio-tile"><span class="bio-label">Record</span><span class="bio-value">@Format.Text(Model.FighterData.RecordText)</span></div>
+    <div class="bio-tile"><span class="bio-label">Age</span><span class="bio-value">@(Model.FighterData.IsActive ? Model.FighterData.Age?.ToString() ?? Format.Missing : Format.Missing)</span></div>
+    <div class="bio-tile"><span class="bio-label">Height</span><span class="bio-value">@Format.Height(Model.FighterData.HeightInches)</span></div>
+    <div class="bio-tile"><span class="bio-label">Reach</span><span class="bio-value">@Format.Inches(Model.FighterData.ReachInches)</span></div>
+    <div class="bio-tile"><span class="bio-label">Weight</span><span class="bio-value">@Format.Pounds(Model.FighterData.WeightLbs)</span></div>
+    <div class="bio-tile"><span class="bio-label">Stance</span><span class="bio-value">@Format.Text(Model.FighterData.Stance)</span></div>
+    <div class="bio-tile"><span class="bio-label">Country</span><span class="bio-value">@Format.Text(Model.FighterData.Country)</span></div>
+    <div class="bio-tile"><span class="bio-label">Fighting Style</span><span class="bio-value">@Format.Text(Model.FighterData.FightingStyle)</span></div>
 </div>
+
+@if (Model.FightHistory.Count > 0)
+{
+    <h2 class="stats-section-title">UFC Fights</h2>
+    <div class="table-card section-card">
+        <table class="table">
+            <thead>
+                <tr><th>Result</th><th>Opponent</th><th>Method</th><th>Event</th><th>Date</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var (bout, ev) in Model.FightHistory)
+                {
+                    var side = Model.Side(bout);
+                    <tr>
+                        <td><span class="result-text @side.Result.ToLower().Replace(" ", "-")">@side.Result</span></td>
+                        <td>
+                            @if (side.OpponentSlug != null)
+                            {
+                                <a asp-page="/FighterDetail" asp-route-slug="@side.OpponentSlug" class="fighter-link">@side.Opponent</a>
+                            }
+                            else
+                            {
+                                @Format.Text(side.Opponent)
+                            }
+                        </td>
+                        <td>
+                            @if (bout.Status == "completed")
+                            {
+                                <a asp-page="/BoutDetail" asp-route-id="@bout.Id" asp-route-eventSlug="@ev.Slug" class="fighter-link">@Format.Text(bout.Method)@(bout.ResultRound != null ? $" (R{bout.ResultRound})" : "")</a>
+                            }
+                            else
+                            {
+                                @Format.Missing
+                            }
+                        </td>
+                        <td><a asp-page="/EventDetail" asp-route-slug="@ev.Slug" class="fighter-link">@ev.Title</a></td>
+                        <td class="nowrap">@(ev.EventDate?.ToString("MMM d, yyyy") ?? Format.Missing)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
 
 @if (Model.WinMethodChartCss != null)
 {
@@ -155,20 +200,6 @@
                         <div class="stat-bar-fill" style="width: @((item.Percent * 100).ToString("0.##"))%"></div>
                     </div>
                     <span class="stat-bar-value">@((item.Percent * 100).ToString("0"))%</span>
-                </div>
-            }
-        </div>
-
-        <div class="table-card stat-bars">
-            <h5>Win Method</h5>
-            @foreach (var item in Model.WinMethodLegend)
-            {
-                <div class="stat-bar-row">
-                    <span class="stat-bar-label">@item.Label</span>
-                    <div class="stat-bar-track">
-                        <div class="stat-bar-fill" style="width: @((Model.FighterData.RecordWins > 0 ? (double)item.Value / Model.FighterData.RecordWins!.Value * 100 : 0).ToString("0.##"))%"></div>
-                    </div>
-                    <span class="stat-bar-value">@item.Value</span>
                 </div>
             }
         </div>

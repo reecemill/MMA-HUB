@@ -26,6 +26,21 @@
 {
     <p class="fighter-meta">No fight card data available for this event yet.</p>
 }
+else if (Model.ShowsPastPicks)
+{
+    <p class="prediction-note">
+        <strong>Model's pick</strong> is what the prediction model said before each fight, from a
+        version trained only on fights before 2024, so it never saw these results.
+        <a asp-page="/HowItWorks">How the predictions work</a>
+    </p>
+}
+else if (Model.Predictions.Count > 0)
+{
+    <p class="prediction-note">
+        <strong>Model's pick</strong> is the favorite and their chance of winning, from each
+        fighter's UFC record so far. <a asp-page="/HowItWorks">How the predictions work</a>
+    </p>
+}
 
 @foreach (var cardSection in Model.BoutsBySection)
 {
@@ -37,6 +52,10 @@
                     <th>Weight Class</th>
                     <th>Matchup</th>
                     <th>Result</th>
+                    @if (Model.Predictions.Count > 0)
+                    {
+                        <th>Model's pick</th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -71,6 +90,29 @@
                                 <text>Upcoming</text>
                             }
                         </td>
+                        @if (Model.Predictions.Count > 0)
+                        {
+                            var pick = Model.Pick(bout);
+                            <td class="pick-cell">
+                                @if (pick != null)
+                                {
+                                    <span>@pick.Value.Favorite</span>
+                                    <span class="pick-percent">@pick.Value.Percent%</span>
+                                    @if (pick.Value.Correct == true)
+                                    {
+                                        <span class="pick-result correct" title="The favorite won">&#10003;</span>
+                                    }
+                                    else if (pick.Value.Correct == false)
+                                    {
+                                        <span class="pick-result wrong" title="The favorite lost">&#10007;</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="pick-percent">&ndash;</span>
+                                }
+                            </td>
+                        }
                     </tr>
                 }
             </tbody>

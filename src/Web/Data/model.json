@@ -1,0 +1,113 @@
+{
+  "trainedOn": "1994-03-10 to 2026-07-18",
+  "snapshotDate": "2026-07-18",
+  "trainingBouts": 8591,
+  "eloK": 128,
+  "featureSet": "record + finishing + layoff",
+  "features": [
+    {
+      "key": "elo",
+      "label": "Elo rating",
+      "scale": 107.00807706179006,
+      "weight": 0.29961011870020093
+    },
+    {
+      "key": "win_pct",
+      "label": "UFC win rate",
+      "scale": 0.1536883401801693,
+      "weight": 0.08903306947589654
+    },
+    {
+      "key": "log_fights",
+      "label": "UFC experience",
+      "scale": 0.9789147105327027,
+      "weight": -0.12446646890830122
+    },
+    {
+      "key": "last3",
+      "label": "Recent form (last 3)",
+      "scale": 0.1837360833315199,
+      "weight": -0.09486584499641913
+    },
+    {
+      "key": "streak",
+      "label": "Current streak",
+      "scale": 2.1043104461392215,
+      "weight": 0.07927422265549583
+    },
+    {
+      "key": "ko_rate",
+      "label": "KO/TKO wins per fight",
+      "scale": 0.21488966133475793,
+      "weight": 0.07685857597642856
+    },
+    {
+      "key": "sub_rate",
+      "label": "Submission wins per fight",
+      "scale": 0.18805430787680608,
+      "weight": 0.06195259200849584
+    },
+    {
+      "key": "finished_rate",
+      "label": "Times finished per fight",
+      "scale": 0.21011220045890627,
+      "weight": -0.07372063673779862
+    },
+    {
+      "key": "log_layoff",
+      "label": "Time since last fight",
+      "scale": 2.399541740397581,
+      "weight": 0.1339512600435455
+    }
+  ],
+  "test": {
+    "from": "2024-01-01",
+    "to": "2026-07-18",
+    "model": {
+      "accuracy": 0.5984615384615385,
+      "log_loss": 0.6651939558201548,
+      "brier": 0.23641212126234185,
+      "bouts": 1300
+    },
+    "elo_only": {
+      "accuracy": 0.5815384615384616,
+      "log_loss": 0.6755729058286419,
+      "brier": 0.2413858394002328,
+      "bouts": 1300
+    },
+    "better_win_rate": {
+      "accuracy": 0.6023076923076923,
+      "bouts": 1300
+    },
+    "calibration": [
+      {
+        "from": 0.5,
+        "to": 0.6,
+        "bouts": 932,
+        "predicted": 0.5422934134017623,
+        "actual": 0.5633047210300429
+      },
+      {
+        "from": 0.6,
+        "to": 0.7,
+        "bouts": 319,
+        "predicted": 0.6384389952288569,
+        "actual": 0.6677115987460815
+      },
+      {
+        "from": 0.7,
+        "to": 0.8,
+        "bouts": 44,
+        "predicted": 0.7297751556864391,
+        "actual": 0.8181818181818182
+      },
+      {
+        "from": 0.8,
+        "to": 1.0,
+        "bouts": 5,
+        "predicted": 0.8116010342741813,
+        "actual": 0.8
+      }
+    ]
+  }
+}

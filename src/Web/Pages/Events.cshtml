@@ -58,7 +58,7 @@
             {
                 <tr>
                     <td><a asp-page="/EventDetail" asp-route-slug="@ev.Slug" class="fighter-link">@ev.Title</a></td>
-                    <td>@ev.Status</td>
+                    <td>@(string.IsNullOrEmpty(ev.Status) ? Format.Missing : char.ToUpper(ev.Status[0]) + ev.Status[1..])</td>
                     <td>@(ev.EventDate?.ToString("MMM dd, yyyy") ?? ev.EventDateLabel ?? "-")</td>
                     <td>@(ev.Venue ?? "-")</td>
                     <td>@(ev.LocationText ?? ev.City ?? ev.Country ?? "-")</td>

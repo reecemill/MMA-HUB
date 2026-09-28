@@ -1,4 +1,4 @@
-﻿@page
+@page
 @model IndexModel
 @{
     ViewData["Title"] = "Home";
@@ -12,28 +12,45 @@
 
 @if (Model.NextEvent != null)
 {
-    <div class="card text-center next-event">
-        <h5>Next Event</h5>
+    <a asp-page="/EventDetail" asp-route-slug="@Model.NextEvent.Slug" class="card text-center next-event card-link">
+        <h5>Next Event <span class="as-of">as of @Model.DataDate.ToString("MMM d, yyyy")</span></h5>
         <div class="next-event-title">@Model.NextEvent.Title</div>
         <div class="next-event-date">@Model.NextEvent.EventDate?.ToString("MMM dd, yyyy")</div>
         @if (!string.IsNullOrWhiteSpace(Model.NextEvent.Venue))
         {
             <div class="next-event-venue">@Model.NextEvent.Venue</div>
         }
-    </div>
+        <span class="next-event-cta">See the card and predictions &rarr;</span>
+    </a>
 }
 
 <div class="row g-4">
     <div class="col-md-6">
         <div class="card text-center">
             <h5>Fighters</h5>
+            <p class="card-sub">Every UFC fighter's record, stats, and fight history</p>
             <a asp-page="/Fighters" class="btn btn-primary">Browse Fighters</a>
         </div>
     </div>
     <div class="col-md-6">
         <div class="card text-center">
             <h5>Events</h5>
+            <p class="card-sub">Every card since UFC 1, and the model's picks on recent ones</p>
             <a asp-page="/Events" class="btn btn-primary">Browse Events</a>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card text-center">
+            <h5>Dream Fight</h5>
+            <p class="card-sub">Match up any two fighters, past or present</p>
+            <a asp-page="/DreamFight" class="btn btn-primary">Pick a Fight</a>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card text-center">
+            <h5>How It Works</h5>
+            <p class="card-sub">How the predictions are made and how often they're right</p>
+            <a asp-page="/HowItWorks" class="btn btn-primary">Read More</a>
         </div>
     </div>
 </div>

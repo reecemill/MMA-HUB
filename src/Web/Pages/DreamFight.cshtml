@@ -1,0 +1,122 @@
+@page
+@model Web.Pages.DreamFightModel
+@inject Web.Services.FightPredictor Predictor
+@{
+    ViewData["Title"] = Model.Result != null
+        ? $"{Model.FighterA!.Name} vs {Model.FighterB!.Name}"
+        : "Dream Fight";
+    ViewData["HideBackground"] = true;
+    var a = Model.FighterA;
+    var b = Model.FighterB;
+    var pa = Model.ProfileA;
+    var pb = Model.ProfileB;
+}
+
+<div class="fighter-header">
+    <h1>Dream Fight</h1>
+    <p class="fighter-meta">Pick any two UFC fighters, past or present, and see who the model favors.</p>
+</div>
+
+<form method="get" class="dream-form">
+    <input type="text" name="a" list="fighter-options" value="@Model.InputA" placeholder="First fighter" aria-label="First fighter" autocomplete="off" />
+    <span class="dream-vs">vs</span>
+    <input type="text" name="b" list="fighter-options" value="@Model.InputB" placeholder="Second fighter" aria-label="Second fighter" autocomplete="off" />
+    <button type="submit" class="btn btn-primary">Predict</button>
+    <datalist id="fighter-options">
+        @foreach (var option in Model.Options)
+        {
+            <option value="@option"></option>
+        }
+    </datalist>
+</form>
+
+@if (Model.Error != null)
+{
+    <p class="form-error">@Model.Error</p>
+}
+
+@if (Model.Result == null)
+{
+    <p class="fighter-meta">Or try one:</p>
+    <ul class="example-list">
+        @foreach (var (x, y) in DreamFightModel.Examples)
+        {
+            if (Model.ExampleNames.ContainsKey(x) && Model.ExampleNames.ContainsKey(y))
+            {
+                <li><a asp-page="/DreamFight" asp-route-a="@x" asp-route-b="@y" class="fighter-link">@Model.ExampleNames[x] vs @Model.ExampleNames[y]</a></li>
+            }
+        }
+    </ul>
+}
+else
+{
+    a = Model.FighterA!;
+    b = Model.FighterB!;
+    int percentA = (int)Math.Round(Model.Result.Fighter1WinProbability * 100);
+    int percentB = 100 - percentA;
+
+    <div class="matchup-result">
+        <div class="matchup-side">
+            <a asp-page="/FighterDetail" asp-route-slug="@a.Slug" class="matchup-name fighter-link">@a.Name</a>
+            <span class="matchup-percent @(percentA >= percentB ? "favorite" : "")">@percentA%</span>
+        </div>
+        <div class="matchup-side right">
+            <a asp-page="/FighterDetail" asp-route-slug="@b.Slug" class="matchup-name fighter-link">@b.Name</a>
+            <span class="matchup-percent @(percentB > percentA ? "favorite" : "")">@percentB%</span>
+        </div>
+        <div class="probability-bar" role="img" aria-label="@a.Name @percentA%, @b.Name @percentB%">
+            <span class="side-a" style="width: @percentA%"></span>
+            <span class="side-b" style="width: @percentB%"></span>
+        </div>
+        <p class="matchup-caption">
+            Each fighter as of their last UFC fight. The model only knows UFC results, not
+            styles, so this is for fun: on real fights it hadn't seen, its favorite won
+            @((Predictor.Model.Test.Model.Accuracy * 100).ToString("0"))% of the time.
+        </p>
+    </div>
+
+    @if (Model.Result.Reasons.Count > 0)
+    {
+        <h2 class="stats-section-title">What the prediction is based on</h2>
+        <div class="table-card reasons-card">
+            @foreach (var reason in Model.Result.Reasons)
+            {
+                bool favorsA = reason.Contribution > 0;
+                <div class="reason-row">
+                    <span class="reason-label">@reason.Label</span>
+                    <div class="reason-track">
+                        <span class="reason-fill @(favorsA ? "toward-a" : "toward-b")" style="width: @Model.ReasonWidth(reason).ToString("0")%"></span>
+                    </div>
+                    <span class="reason-favors">favors @(favorsA ? a.Name : b.Name)</span>
+                </div>
+            }
+            <p class="reasons-note">Bar length is how much each factor moves the prediction. <a asp-page="/HowItWorks">How the predictions work</a></p>
+        </div>
+    }
+
+    <h2 class="stats-section-title">Tale of the tape</h2>
+    <div class="table-card section-card">
+        <table class="table tape-table">
+            <thead>
+                <tr><th>@a.Name</th><th></th><th>@b.Name</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>@pa!.UfcRecord</td><th>UFC record</th><td>@pb!.UfcRecord</td></tr>
+                <tr><td>@pa.Elo.ToString("0")</td><th>Elo rating</th><td>@pb.Elo.ToString("0")</td></tr>
+                <tr>
+                    <td><partial name="_RecentResults" model="pa.Recent" /></td>
+                    <th>Last 5 (newest first)</th>
+                    <td><partial name="_RecentResults" model="pb.Recent" /></td>
+                </tr>
+                <tr><td>@pa.KoWins</td><th>KO/TKO wins</th><td>@pb.KoWins</td></tr>
+                <tr><td>@pa.SubWins</td><th>Submission wins</th><td>@pb.SubWins</td></tr>
+                <tr><td>@pa.TimesFinished</td><th>Times finished</th><td>@pb.TimesFinished</td></tr>
+                <tr><td>@(pa.LastFight?.ToString("MMM yyyy") ?? Format.Missing)</td><th>Last UFC fight</th><td>@(pb.LastFight?.ToString("MMM yyyy") ?? Format.Missing)</td></tr>
+                <tr><td>@Format.Height(a.HeightInches)</td><th>Height*</th><td>@Format.Height(b.HeightInches)</td></tr>
+                <tr><td>@Format.Inches(a.ReachInches)</td><th>Reach*</th><td>@Format.Inches(b.ReachInches)</td></tr>
+                <tr><td>@Format.Text(a.Stance)</td><th>Stance*</th><td>@Format.Text(b.Stance)</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="reasons-note">* Shown for context. The model leaves physical stats out: they made its predictions worse on fights it hadn't seen.</p>
+}

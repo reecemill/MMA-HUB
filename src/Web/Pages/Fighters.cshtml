@@ -65,7 +65,7 @@
                             @fighter.Name
                         </a>
                     </td>
-                    <td>@fighter.Nickname</td>
+                    <td>@Format.Nickname(fighter.Nickname)</td>
                     <td>@fighter.Division</td>
                     <td>@fighter.RecordText</td>
                     <td>@(fighter.IsActive ? "Active" : "Inactive")</td>

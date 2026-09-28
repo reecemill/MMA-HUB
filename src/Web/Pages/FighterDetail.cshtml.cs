@@ -22,6 +22,9 @@ public class FighterDetailModel : PageModel
     public List<(string Label, decimal Percent)> StrikePositionBreakdown { get; set; } = [];
     public List<(string Label, decimal Percent)> StrikeTargetBreakdown { get; set; } = [];
 
+    // UFC fights, newest first.
+    public List<(Bout Bout, Event Event)> FightHistory { get; set; } = [];
+
     public FighterDetailModel(AppDbContext db)
     {
         _db = db;
@@ -40,6 +43,15 @@ public class FighterDetailModel : PageModel
         }
 
         FighterData = fighter;
+
+        var fights = await (
+                from b in _db.Bouts.Include(b => b.Fighter1).Include(b => b.Fighter2)
+                join e in _db.Events on b.EventId equals e.Id
+                where (b.Fighter1Id == fighter.Id || b.Fighter2Id == fighter.Id) && !b.IsCancelled
+                orderby e.EventDate descending
+                select new { Bout = b, Event = e })
+            .ToListAsync();
+        FightHistory = fights.Select(x => (x.Bout, x.Event)).ToList();
 
         BuildWinMethodChart();
         BuildSummaryStats();
@@ -115,6 +127,21 @@ public class FighterDetailModel : PageModel
     }
 
     public static string FormatPercent(decimal fraction) => (fraction * 100).ToString("0") + "%";
+
+    // This fighter's side of a bout: result, and the opponent's name and slug.
+    public (string Result, string? Opponent, string? OpponentSlug) Side(Bout b)
+    {
+        bool isFighter1 = b.Fighter1Id == FighterData.Id;
+        string? outcome = isFighter1 ? b.Fighter1Outcome : b.Fighter2Outcome;
+        string result = b.Status != "completed" ? "Upcoming"
+            : b.WinnerFighterId == FighterData.Id ? "Win"
+            : b.WinnerFighterId != null ? "Loss"
+            : outcome == "draw" ? "Draw"
+            : "No contest";
+        return isFighter1
+            ? (result, b.Fighter2?.Name ?? b.Fighter2Name, b.Fighter2?.Slug)
+            : (result, b.Fighter1?.Name ?? b.Fighter1Name, b.Fighter1?.Slug);
+    }
 
     public static string FormatFightTime(int seconds)
     {
