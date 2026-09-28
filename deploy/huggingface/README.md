@@ -16,5 +16,3 @@ Every UFC fighter and event since UFC 1, with a prediction model that picks figh
 The model is a logistic regression on each fighter's UFC history. On 1,300 fights it never saw, its favorite won about 60% of the time, and its percentages match how often favorites actually win. The site's "How It Works" page has the full results, including where it's no better than a simple rule.
 
 The data is a snapshot, so "upcoming" means upcoming when it was collected; the footer shows the date.
-
-Code: [github.com/reecemill/MMA-HUB](https://github.com/reecemill/MMA-HUB)

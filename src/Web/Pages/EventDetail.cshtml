@@ -1,5 +1,6 @@
 @page "{slug}"
 @model Web.Pages.EventDetailModel
+@inject Web.Services.FightPredictor Predictor
 @{
     ViewData["Title"] = Model.EventData.Title ?? "Event";
     ViewData["HideBackground"] = true;
@@ -20,6 +21,13 @@
             <text>&middot; @(Model.EventData.LocationText ?? Model.EventData.City)</text>
         }
     </p>
+    @if (Model.EventData.Status == "scheduled" && Model.EventData.EventDate < DateTime.UtcNow.Date)
+    {
+        <p class="prediction-note">
+            This card was still upcoming when the data was collected (@Predictor.SnapshotDate.ToString("MMM d, yyyy")),
+            so its results aren't included. The picks below were made from what was known then.
+        </p>
+    }
 </div>
 
 @if (Model.BoutsBySection.Count == 0)
