@@ -7,23 +7,16 @@
     <title>@ViewData["Title"] — MMA Stats</title>
     <script type="importmap"></script>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/lib/bioelectric/bioelectric-core.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/Web.styles.css" asp-append-version="true" />
 </head>
 <body class="@(ViewData["HideBackground"] is true ? "flat-bg" : "")">
     @if (ViewData["HideBackground"] is not true)
     {
-        <div class="bioelectric">
-            <canvas id="bioelectric-canvas"></canvas>
-            <div class="noise-overlay"></div>
-            <div class="vignette"></div>
+        <div class="arena" aria-hidden="true">
+            <canvas id="arena-canvas"></canvas>
         </div>
-        <script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6.0.4"></script>
-        <script src="~/lib/bioelectric/bioelectric-core.js"></script>
-        <script>
-          createBioElectricAnimation(document.getElementById('bioelectric-canvas'));
-        </script>
+        <script src="~/js/arena.js" asp-append-version="true"></script>
     }
     @if (ViewData["HideNav"] is not true)
     {
