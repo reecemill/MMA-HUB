@@ -1,14 +1,13 @@
 """Train the fight prediction model and export it for the website.
 
-    python ml/download_ufcstats.py          # once: per-fight stats into data/ufcstats/
     python ml/train.py [path/to/mma.db] [--dry-run]     # default: data/mma.db
 
-Reads the SQLite snapshot (see SnapshotExporter.cs), walks every UFC bout in date
-order, and builds each fighter's features only from fights *before* the one being
-predicted, so the model never sees a result it's asked to predict. Fighters'
-career stats from the API aren't used for the same reason: they're current
-totals that already include the fights being predicted. Striking and grappling
-rates come instead from ufcstats.com's per-fight stats, accumulated fight by fight.
+Reads the SQLite snapshot (see SnapshotExporter.cs) of the UFC.com data, walks every
+UFC fight in date order, and builds each fighter's features only from fights *before*
+the one being predicted, so the model never sees a result it's asked to predict.
+Striking and grappling rates come from UFC.com's stats for each fight, accumulated
+fight by fight; the career totals UFC.com shows aren't used, since they already
+include the fights being predicted.
 
 Compares logistic regression, gradient boosting and a small neural network on
 the validation years, then reports every family once on the test years.
@@ -22,7 +21,7 @@ import json
 import math
 import sqlite3
 import sys
-from datetime import datetime
+from dataclasses import dataclass, fields
 from pathlib import Path
 
 import numpy as np
@@ -34,11 +33,8 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-import ufcstats
-
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "src" / "Web" / "Data"
-UFCSTATS = ROOT / "data" / "ufcstats"
 
 # Held-out periods: choose settings on validation, report once on test.
 VALIDATION_START = "2022-01-01"
@@ -46,7 +42,7 @@ TEST_START = "2024-01-01"
 
 ELO_START = 1500.0
 KO_METHODS = {"KO/TKO", "TKO - Doctor's Stoppage"}
-SUB_METHODS = {"SUB", "Submission"}
+SUB_METHODS = {"Submission"}
 
 # Every feature is (fighter A's value) - (fighter B's value). Labels are shown on the
 # site next to each prediction's biggest reasons.
@@ -64,7 +60,7 @@ FEATURES = {
     "height": "Height",
     "reach": "Reach",
     "southpaw": "Southpaw stance",
-    # From ufcstats.com's per-fight stats, over the fighter's earlier UFC fights.
+    # From UFC.com's per-fight stats, over the fighter's earlier UFC fights.
     "slpm": "Strikes landed per minute",
     "sapm": "Strikes absorbed per minute",
     "str_acc": "Striking accuracy",
@@ -111,29 +107,74 @@ PRIOR_MINUTES, PRIOR_STRIKES, PRIOR_TAKEDOWNS = 15.0, 20.0, 5.0
 TRAIN_SINCE = [None, "2005-01-01", "2010-01-01", "2015-01-01"]
 
 
+@dataclass
+class FightStats:
+    """One fighter's totals in one fight (knockdowns, strikes, takedowns, control)."""
+    minutes: float = 0.0
+    sig_landed: float = 0.0
+    sig_attempted: float = 0.0
+    knockdowns: float = 0.0
+    td_landed: float = 0.0
+    td_attempted: float = 0.0
+    sub_attempts: float = 0.0
+    control_seconds: float = 0.0
+
+    def __iadd__(self, other):
+        for f in fields(self):
+            setattr(self, f.name, getattr(self, f.name) + getattr(other, f.name))
+        return self
+
+
 def load(db_path):
+    """Every fight with both corners known, the fighters, and each fighter's stats per
+    fight, keyed by (fight id, fighter id)."""
     con = sqlite3.connect(db_path)
-    bouts = pd.read_sql(
-        """select b.Id, b.Fighter1Id, b.Fighter2Id, b.WinnerFighterId, b.Fighter1Outcome,
-                  b.Method, b.Status, b.WeightClass, e.EventDate, e.Status as EventStatus,
-                  e.Title as EventTitle, e.Slug as EventSlug
-           from Bouts b join Events e on e.Id = b.EventId
-           where b.Fighter1Id is not null and b.Fighter2Id is not null""",
+    fights = pd.read_sql(
+        """select f.Id, e.Date as EventDate, f.Status, f.Method, f.WinnerFighterId, f.DurationSeconds,
+                  red.FighterId as Fighter1Id, blue.FighterId as Fighter2Id, red.Outcome as Fighter1Outcome
+           from UfcFights f
+           join UfcEvents e on e.Id = f.EventId
+           join UfcFightFighters red on red.FightId = f.Id and red.Corner = 'Red'
+           join UfcFightFighters blue on blue.FightId = f.Id and blue.Corner = 'Blue'
+           where e.Date is not null""",
         con, parse_dates=["EventDate"])
     fighters = pd.read_sql(
-        "select Id, Slug, Name, Division, Age, HeightInches, ReachInches, Stance, UfcStatsId from Fighters", con)
+        """select Id, Slug, FirstName || ' ' || LastName as Name, WeightClass as Division,
+                  DateOfBirth, HeightInches, ReachInches, Stance
+           from UfcFighters""",
+        con, parse_dates=["DateOfBirth"])
+    rows = pd.read_sql(
+        """select s.FightId, s.FighterId, f.DurationSeconds, s.Knockdowns, s.SigStrikesLanded, s.SigStrikesAttempted,
+                  s.TakedownsLanded, s.TakedownsAttempted, s.SubmissionsAttempted, s.ControlSeconds
+           from UfcFightStats s join UfcFights f on f.Id = s.FightId
+           where f.DurationSeconds > 0""", con)
     con.close()
-    # Within a date, the API's bout order is arbitrary; sort by id so runs are repeatable.
-    bouts = bouts.sort_values(["EventDate", "Id"], kind="stable").reset_index(drop=True)
-    return bouts, fighters
+
+    # UFC.com marks a few 1990s fights "Over" rather than "Final".
+    fights["Status"] = np.select([fights.Status.isin(["Final", "Over"]), fights.Status == "Upcoming"],
+                                 ["completed", "upcoming"], fights.Status)
+    # Within a date, the card's order isn't a time order; sort by id so runs are repeatable.
+    fights = fights.sort_values(["EventDate", "Id"], kind="stable").reset_index(drop=True)
+
+    stats = {(r.FightId, r.FighterId): FightStats(
+        r.DurationSeconds / 60, r.SigStrikesLanded, r.SigStrikesAttempted, r.Knockdowns,
+        r.TakedownsLanded, r.TakedownsAttempted, r.SubmissionsAttempted, r.ControlSeconds)
+        for r in rows.itertuples(index=False)}
+    return fights, fighters, stats
 
 
-def physical_attributes(fighters, snapshot_date, name_of, birth_of):
-    """Height, reach, stance, and age reference per fighter, with gaps filled, plus the
-    fighter's ufcstats.com name (to find their fight stats) and date of birth.
+def lookup(stats, fight_id, fighter_a, fighter_b):
+    """Both fighters' stats for a fight, or None if either is missing."""
+    a, b = stats.get((fight_id, fighter_a)), stats.get((fight_id, fighter_b))
+    return (a, b) if a is not None and b is not None else None
+
+
+def physical_attributes(fighters, snapshot_date):
+    """Height, reach, stance, date of birth, and an age reference per fighter, with gaps filled.
 
     Missing or zero height gets the median for the fighter's division; missing reach
-    is set to height (the typical ratio is close to 1).
+    is set to height (the typical ratio is close to 1). The age reference is only used
+    for the few fighters without a date of birth: the median age at the snapshot.
     """
     f = fighters.copy()
     f["height"] = pd.to_numeric(f["HeightInches"], errors="coerce").where(lambda h: h > 48)
@@ -143,16 +184,13 @@ def physical_attributes(fighters, snapshot_date, name_of, birth_of):
     f["reach"] = f["reach"].fillna(f["height"])
     stance = f["Stance"].fillna("")
     f["southpaw"] = np.select([stance == "Southpaw", stance == "Switch"], [1.0, 0.5], 0.0)
-    # Age as of the snapshot. For retired fighters UFC.com often stopped updating it, so
-    # age at older fights comes out too young; the model only keeps age if it helps.
-    f["age_ref"] = pd.to_numeric(f["Age"], errors="coerce").fillna(f["Age"].median())
-    f["stats_name"] = f["UfcStatsId"].map(name_of)
-    f["birth"] = pd.to_datetime(f["UfcStatsId"].map(birth_of))
-    return f.set_index("Id")[["Slug", "Name", "height", "reach", "southpaw", "age_ref", "stats_name", "birth"]]
+    f["birth"] = f["DateOfBirth"]
+    f["age_ref"] = ((snapshot_date - f["birth"]).dt.days / 365.25).median()
+    return f.set_index("Id")[["Slug", "Name", "height", "reach", "southpaw", "age_ref", "birth"]]
 
 
 class FighterHistory:
-    """What's known about one fighter from their UFC bouts so far."""
+    """What's known about one fighter from their UFC fights so far."""
 
     def __init__(self):
         self.elo = ELO_START
@@ -164,8 +202,8 @@ class FighterHistory:
         self.sub_wins = 0
         self.finished = 0
         self.last_fight = None
-        self.own = ufcstats.FightStats()       # totals over fights with per-fight stats
-        self.against = ufcstats.FightStats()   # what opponents did in those fights
+        self.own = FightStats()       # totals over fights with per-fight stats
+        self.against = FightStats()   # what opponents did in those fights
 
     def add_stats(self, own, against):
         self.own += own
@@ -225,8 +263,7 @@ class FighterHistory:
 def dated_features(state, last_fight, age_ref, birth, snapshot_date, date):
     """Adds the features that depend on when the fight happens.
 
-    Age comes from the date of birth when ufcstats.com has it; otherwise from UFC.com's
-    age, which is stale for retired fighters.
+    Age comes from the date of birth; the few fighters without one get the median age.
     """
     days = (date - last_fight).days if last_fight is not None else 0
     if pd.notna(birth):
@@ -251,14 +288,11 @@ def pair_features(xa, xb):
     return row
 
 
-def league_priors(bouts, phys, fights, before):
-    """League-average rates, from the per-fight stats of bouts before `before`."""
-    total = ufcstats.FightStats()
-    for b in bouts[(bouts.Status == "completed") & (bouts.EventDate < before)].itertuples():
-        if b.Fighter1Id not in phys.index or b.Fighter2Id not in phys.index:
-            continue
-        found = ufcstats.lookup(fights, b.EventDate.normalize(),
-                                phys.at[b.Fighter1Id, "stats_name"], phys.at[b.Fighter2Id, "stats_name"])
+def league_priors(fights, stats, before):
+    """League-average rates, from the per-fight stats of fights before `before`."""
+    total = FightStats()
+    for b in fights[(fights.Status == "completed") & (fights.EventDate < before)].itertuples():
+        found = lookup(stats, b.Id, b.Fighter1Id, b.Fighter2Id)
         if found:
             total += found[0]
             total += found[1]
@@ -272,24 +306,27 @@ def league_priors(bouts, phys, fights, before):
     }
 
 
-def walk_bouts(bouts, phys, snapshot_date, k, fights, priors):
-    """Features for every completed bout (from history before it), and final histories.
+def walk_fights(fights, phys, snapshot_date, k, stats, priors):
+    """Features for every completed fight (from history before it), and final histories.
 
-    A bout's own per-fight stats are added to each fighter's totals only after its
-    features are recorded, like its result.
+    A fight's own stats are added to each fighter's totals only after its features are
+    recorded, like its result.
     """
     histories = {}
     rows = []
-    for b in bouts.itertuples():
+    seen = set()
+    for b in fights.itertuples():
         if b.Status != "completed":
             continue
+        assert b.Id not in seen, f"fight {b.Id} appears twice"
+        seen.add(b.Id)
         a_id, b_id = b.Fighter1Id, b.Fighter2Id
         if a_id not in phys.index or b_id not in phys.index:
             continue
         ha = histories.setdefault(a_id, FighterHistory())
         hb = histories.setdefault(b_id, FighterHistory())
 
-        if b.Fighter1Outcome == "draw":
+        if b.Fighter1Outcome == "Draw":
             score_a = 0.5
         elif b.WinnerFighterId == a_id:
             score_a = 1.0
@@ -301,10 +338,9 @@ def walk_bouts(bouts, phys, snapshot_date, k, fights, priors):
         if score_a != 0.5:
             xa = fighter_vector(ha, phys.loc[a_id], snapshot_date, b.EventDate, priors)
             xb = fighter_vector(hb, phys.loc[b_id], snapshot_date, b.EventDate, priors)
-            rows.append({"date": b.EventDate, "bout": b.Id, "y": score_a, **pair_features(xa, xb)})
+            rows.append({"date": b.EventDate, "fight": int(b.Id), "y": score_a, **pair_features(xa, xb)})
 
-        found = ufcstats.lookup(fights, b.EventDate.normalize(),
-                                phys.at[a_id, "stats_name"], phys.at[b_id, "stats_name"])
+        found = lookup(stats, b.Id, a_id, b_id)
         if found:
             ha.add_stats(found[0], found[1])
             hb.add_stats(found[1], found[0])
@@ -327,10 +363,10 @@ def walk_bouts(bouts, phys, snapshot_date, k, fights, priors):
 
 
 def symmetric(df):
-    """Every bout both ways round, so the model can't learn which slot the winner is in.
+    """Every fight both ways round, so the model can't learn which slot the winner is in.
 
-    (The API lists the loser first in nearly every bout.) With no intercept and
-    difference features, P(A beats B) is then exactly 1 - P(B beats A).
+    (UFC.com lists the red corner first, usually the champion or the favorite.) With no
+    intercept and difference features, P(A beats B) is then exactly 1 - P(B beats A).
     """
     flipped = df.copy()
     flipped[list(FEATURES)] = -flipped[list(FEATURES)]
@@ -339,7 +375,7 @@ def symmetric(df):
 
 
 def one_side(df):
-    """Each bout once, with a random fighter as A, for fair accuracy numbers."""
+    """Each fight once, with a random fighter as A, for fair accuracy numbers."""
     rng = np.random.default_rng(0)
     flip = rng.random(len(df)) < 0.5
     out = df.copy()
@@ -372,7 +408,7 @@ class Model:
 
 class SymmetricModel:
     """A model that isn't symmetric by construction (trees, a network), made symmetric:
-    trained on every bout both ways round, and predicting the average of P(A beats B)
+    trained on every fight both ways round, and predicting the average of P(A beats B)
     and 1 - P(B beats A), so the two always add to 1."""
 
     def __init__(self, features, make, settings):
@@ -424,13 +460,13 @@ def scores(y, p):
 
 
 def learning_rows(data, since, before):
-    """The bouts a model's weights are fitted on: from `since` (or the start) up to `before`."""
+    """The fights a model's weights are fitted on: from `since` (or the start) up to `before`."""
     rows = data[data.date < before]
     return rows if since is None else rows[rows.date >= since]
 
 
 def paired_bootstrap(y, p_new, p_old, draws=2000):
-    """Mean and 95% interval of (new - old) in log loss and in accuracy, resampling test bouts.
+    """Mean and 95% interval of (new - old) in log loss and in accuracy, resampling test fights.
 
     `p_old` may be hard 0/1 picks (a rule), in which case only accuracy is compared.
     """
@@ -458,23 +494,17 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     dry_run = "--dry-run" in sys.argv
     db_path = Path(args[0]) if args else ROOT / "data" / "mma.db"
-    bouts, fighters = load(db_path)
-    last_result = bouts.loc[bouts.Status == "completed", "EventDate"].max()
-    # Fighter ages were recorded when the scraper ran, just after the last results.
+    fights, fighters, stats = load(db_path)
+    last_result = fights.loc[fights.Status == "completed", "EventDate"].max()
     snapshot_date = last_result
-    if not (UFCSTATS / "ufc_fight_stats.csv").exists():
-        sys.exit("No per-fight stats. Download them first: python ml/download_ufcstats.py")
-    fights, name_of, birth_of = ufcstats.load(UFCSTATS)
-    phys = physical_attributes(fighters, snapshot_date, name_of, birth_of)
-    priors = league_priors(bouts, phys, fights, pd.Timestamp(VALIDATION_START))
+    phys = physical_attributes(fighters, snapshot_date)
+    priors = league_priors(fights, stats, pd.Timestamp(VALIDATION_START))
 
-    completed = bouts[bouts.Status == "completed"]
-    has_stats = np.array([
-        a in phys.index and b in phys.index and ufcstats.lookup(
-            fights, d.normalize(), phys.at[a, "stats_name"], phys.at[b, "stats_name"]) is not None
-        for a, b, d in zip(completed.Fighter1Id, completed.Fighter2Id, completed.EventDate)])
+    completed = fights[fights.Status == "completed"]
+    has_stats = np.array([lookup(stats, i, a, b) is not None
+                          for i, a, b in zip(completed.Id, completed.Fighter1Id, completed.Fighter2Id)])
     in_test = (completed.EventDate >= TEST_START).to_numpy()
-    print(f"Per-fight stats found for {has_stats.mean():.1%} of {len(completed)} completed bouts "
+    print(f"Per-fight stats found for {has_stats.mean():.1%} of {len(completed)} completed fights "
           f"({has_stats[in_test].mean():.1%} in the test years); dates of birth for "
           f"{phys.birth.notna().mean():.1%} of fighters")
 
@@ -482,7 +512,7 @@ def main():
     # Each family searches Elo K, feature sets, the first year its weights learn from, and its
     # own settings; the lowest log loss wins. Height and reach stay candidates in "everything"
     # so they keep being checked.
-    walks = {k: walk_bouts(bouts, phys, snapshot_date, k, fights, priors) for k in (32, 64, 128)}
+    walks = {k: walk_fights(fights, phys, snapshot_date, k, stats, priors) for k in (32, 64, 128)}
     print("\nValidation (train before 2022, test 2022-2023):")
     best = {}
     for family, makers in FAMILIES.items():
@@ -552,7 +582,7 @@ def main():
         "comparisons": {name: {metric: [float(v) for v in interval] for metric, interval in c.items()}
                         for name, c in comparisons.items()},
     }
-    print(f"\nTest ({TEST_START} to {last_result:%Y-%m-%d}, {len(test)} bouts), each family's validation pick:")
+    print(f"\nTest ({TEST_START} to {last_result:%Y-%m-%d}, {len(test)} fights), each family's validation pick:")
     for family, s in results["families"].items():
         print(f"  {family:<20} accuracy {s['accuracy']:.3f}  log loss {s['log_loss']:.4f}  brier {s['brier']:.4f}")
     s = results["before_fight_stats"]
@@ -576,13 +606,13 @@ def main():
                   + (f"  log loss {s['log_loss']:.4f}" if "log_loss" in s else ""))
     print("  Calibration (favorite's predicted vs actual win rate):")
     for b in buckets:
-        print(f"    {b['from']:.0%}-{b['to']:.0%}: {b['bouts']:>4} bouts, "
+        print(f"    {b['from']:.0%}-{b['to']:.0%}: {b['bouts']:>4} fights, "
               f"predicted {b['predicted']:.3f}, actual {b['actual']:.3f}")
     if dry_run:
         print("\n--dry-run: nothing written")
         return
 
-    # --- Final model on every bout since the chosen start, exported for the site -------
+    # --- Final model on every fight since the chosen start, exported for the site ------
     final_rows = learning_rows(data, since, last_result + pd.Timedelta(days=1))
     final = Model(feats, c).fit(final_rows)
     coefs = final.lr.coef_[0]
@@ -623,16 +653,17 @@ def main():
         }
     (OUT / "fighter_profiles.json").write_text(json.dumps(profiles, separators=(",", ":")))
 
-    # What the test model (trained only on bouts before the test years) picked for each
-    # test-year bout before it happened. The site shows these on past events.
+    # What the test model (trained only on fights before the test years) picked for each
+    # test-year fight before it happened, as P(red corner wins). The site shows these on
+    # past events.
     held_out = data[data.date >= TEST_START]
-    past = dict(zip(held_out.bout, np.round(model.predict(held_out), 4)))
+    past = dict(zip(held_out.fight, np.round(model.predict(held_out), 4)))
     (OUT / "past_predictions.json").write_text(json.dumps(
-        {"model": "trained on bouts before " + TEST_START, "fighter1WinProbability": past},
+        {"model": "trained on fights before " + TEST_START, "fighter1WinProbability": past},
         separators=(",", ":")))
 
-    # Reference predictions for the scheduled bouts, to check the site's math against.
-    upcoming = bouts[(bouts.Status == "confirmed") & (bouts.EventStatus == "scheduled")]
+    # Reference predictions for the upcoming fights, to check the site's math against.
+    upcoming = fights[(fights.Status == "upcoming") & fights.Fighter1Id.isin(phys.index) & fights.Fighter2Id.isin(phys.index)]
     check = []
     for b in upcoming.itertuples():
         xa = fighter_vector(histories.get(b.Fighter1Id, FighterHistory()), phys.loc[b.Fighter1Id],
@@ -640,9 +671,9 @@ def main():
         xb = fighter_vector(histories.get(b.Fighter2Id, FighterHistory()), phys.loc[b.Fighter2Id],
                             snapshot_date, b.EventDate, priors)
         row = pd.DataFrame([pair_features(xa, xb)])
-        check.append({"bout": b.Id, "date": f"{b.EventDate:%Y-%m-%d}", "fighter1": phys.loc[b.Fighter1Id].Slug,
+        check.append({"fight": int(b.Id), "date": f"{b.EventDate:%Y-%m-%d}", "fighter1": phys.loc[b.Fighter1Id].Slug,
                       "fighter2": phys.loc[b.Fighter2Id].Slug,
-                      "p1": round(float(final.predict(row)[0]), 4)})
+                      "p1": round(float(final.predict(row)[0]), 6)})
     (ROOT / "ml" / "reference_predictions.json").write_text(json.dumps(check, indent=1))
     print(f"\nWrote {OUT / 'model.json'}, fighter_profiles.json ({len(profiles)} fighters), "
           f"and {len(check)} reference predictions")
