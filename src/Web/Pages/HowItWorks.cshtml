@@ -106,10 +106,9 @@
         </li>
     </ul>
     <p>
-        The striking and grappling numbers are built fight by fight from
-        <a href="https://github.com/Greco1899/scrape_ufc_stats">a public export of ufcstats.com's per-fight stats</a>,
-        so each prediction only sees the fights that came before it. A fighter with little UFC fight time is pulled toward
-        the league average until there's enough to go on, and fighters making their UFC debut are treated as average.
+        The striking and grappling numbers are built fight by fight from UFC.com's own stats for each fight, so each
+        prediction only sees the fights that came before it. A fighter with little UFC fight time is pulled toward the
+        league average until there's enough to go on, and fighters making their UFC debut are treated as average.
         Dream fights use each fighter as of their last UFC fight.
     </p>
 
@@ -181,22 +180,17 @@
         </li>
     </ul>
 
-    <h2 class="stats-section-title">Cleaning the data first</h2>
+    <h2 class="stats-section-title">Keeping the test honest</h2>
     <p>
-        The first version of the model picked 71% of winners, which was too good to be true. Duplicates in the data were
-        leaking results:
+        The first version of the model picked 71% of winners, which was too good to be true: the data it came from (a
+        third-party API) listed many events and fights twice, so a fight's own result leaked into the history used to
+        predict it. The data now comes straight from UFC.com, where each fight appears once, and the model checks
+        that no fight is counted twice.
     </p>
-    <ul>
-        <li>
-            The API lists most recent events twice under different addresses (for example "UFC 322" and "UFC 322: Della
-            Maddalena vs. Makhachev"), so a fight's own result showed up in the history used to predict its twin. The scraper
-            now marks these, and the site and model skip them.
-        </li>
-        <li>Some fights appear twice on one card, or on an unrelated later card. These are marked the same way.</li>
-    </ul>
     <p>
-        The API also lists the loser first in almost every fight, which a model could learn instead of anything real, so
-        each fight is used both ways round in training.
+        UFC.com lists the red corner first, which is usually the champion or the better-known fighter. A model could
+        learn that instead of anything real, so each fight is used both ways round in training, and the two
+        predictions for a fight always add up to 100%.
     </p>
     <p class="fighter-meta">
         Trained on @Model.Info.TrainingBouts.ToString("N0") fights (@Model.Info.TrainedOn). Elo K-factor @Model.Info.EloK.

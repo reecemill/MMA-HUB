@@ -26,7 +26,7 @@ public class FightPredictor
 
     public ModelInfo Model { get; }
     private readonly Dictionary<string, FighterProfile> _profiles;
-    private readonly Dictionary<string, double> _pastPredictions;
+    private readonly Dictionary<int, double> _pastPredictions;
 
     public FightPredictor(IWebHostEnvironment env)
     {
@@ -45,11 +45,11 @@ public class FightPredictor
     public FighterProfile? Profile(string? slug) =>
         slug != null && _profiles.TryGetValue(slug, out FighterProfile? p) ? p : null;
 
-    // What the held-out test model picked before a 2024+ bout, as P(fighter 1 wins).
-    public double? PastPrediction(string boutId) =>
-        _pastPredictions.TryGetValue(boutId, out double p) ? p : null;
+    // What the held-out test model picked before a 2024+ fight, as P(red corner wins).
+    public double? PastPrediction(int fightId) =>
+        _pastPredictions.TryGetValue(fightId, out double p) ? p : null;
 
-    // For an upcoming bout on a known date. Null if either fighter isn't in the data.
+    // For an upcoming fight on a known date. Null if either fighter isn't in the data.
     public Prediction? PredictBout(string? slug1, string? slug2, DateTime date)
     {
         FighterProfile? a = Profile(slug1), b = Profile(slug2);
@@ -150,7 +150,7 @@ public class FighterProfile
     public double Southpaw { get; set; }
     public double AgeRef { get; set; }
     public DateTime? Birth { get; set; }
-    // Rates over earlier UFC fights with ufcstats.com stats, pulled toward the league
+    // Rates over earlier UFC fights with per-fight stats, pulled toward the league
     // average for fighters with little fight time (see FighterHistory.state in ml/train.py).
     public double Slpm { get; set; }
     public double Sapm { get; set; }
@@ -230,5 +230,5 @@ public class CalibrationBucket
 
 class PastPredictions
 {
-    public Dictionary<string, double> Fighter1WinProbability { get; set; } = [];
+    public Dictionary<int, double> Fighter1WinProbability { get; set; } = [];
 }

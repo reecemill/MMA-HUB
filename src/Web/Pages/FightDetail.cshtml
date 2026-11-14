@@ -1,0 +1,137 @@
+@page "{id:int}"
+@model Web.Pages.FightDetailModel
+@{
+    var fight = Model.FightData;
+    var red = Model.Red;
+    var blue = Model.Blue;
+    var rs = Model.RedStats;
+    var bs = Model.BlueStats;
+    string redName = red?.Name ?? "TBD";
+    string blueName = blue?.Name ?? "TBD";
+    ViewData["Title"] = $"{redName} vs {blueName}";
+    ViewData["HideBackground"] = true;
+}
+
+<a asp-page="/EventDetail" asp-route-id="@fight.EventId" class="back-link">&larr; @(fight.Event?.Name ?? "Back to Event")</a>
+
+<div class="fighter-header">
+    <h1>
+        @if (red != null)
+        {
+            <a asp-page="/FighterDetail" asp-route-slug="@red.Slug" class="fighter-link @(fight.Red?.Outcome == "Win" ? "bout-winner" : "")">@redName</a>
+        }
+        else
+        {
+            @redName
+        }
+        <span class="fighter-nickname">vs</span>
+        @if (blue != null)
+        {
+            <a asp-page="/FighterDetail" asp-route-slug="@blue.Slug" class="fighter-link @(fight.Blue?.Outcome == "Win" ? "bout-winner" : "")">@blueName</a>
+        }
+        else
+        {
+            @blueName
+        }
+    </h1>
+    <p class="fighter-meta">
+        @Format.Text(fight.WeightClass)
+        @if (fight.IsTitleFight)
+        {
+            <span class="champion-badge">Title Fight</span>
+        }
+        @if (fight.FightOfTheNight)
+        {
+            <span class="champion-badge">Fight of the Night</span>
+        }
+        &middot; @Format.Date(fight.Event?.Date)
+        @if (fight.ScheduledRounds != null)
+        {
+            <text>&middot; @fight.ScheduledRounds rounds</text>
+        }
+        @if (fight.Referee != null)
+        {
+            <text>&middot; Referee @fight.Referee</text>
+        }
+    </p>
+    @if (fight.IsFinished)
+    {
+        <p class="fighter-meta">
+            <strong>@(fight.WinnerFighterId == red?.Id ? redName : fight.WinnerFighterId == blue?.Id ? blueName : fight.Red?.Outcome ?? "No result")</strong>
+            @if (fight.WinnerFighterId != null)
+            {
+                <text>wins by</text>
+            }
+            @Format.Text(fight.Method)@(fight.EndingRound != null ? $", round {fight.EndingRound}" : "")@(fight.EndingTime != null ? $" at {fight.EndingTime}" : "")@(fight.Ending != null ? $" ({fight.Ending})" : "")
+        </p>
+    }
+    else
+    {
+        <p class="fighter-meta">Upcoming</p>
+    }
+</div>
+
+@if (rs != null || bs != null)
+{
+    <h2 class="stats-section-title">Fight Stats</h2>
+    <div class="table-card">
+        <table class="table">
+            <thead>
+                <tr><th>@redName</th><th>Stat</th><th>@blueName</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>@(rs?.Knockdowns.ToString() ?? "-")</td><td>Knockdowns</td><td>@(bs?.Knockdowns.ToString() ?? "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.SigStrikesLanded, rs.SigStrikesAttempted) : "-")</td><td>Sig. Strikes</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.SigStrikesLanded, bs.SigStrikesAttempted) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.TotalStrikesLanded, rs.TotalStrikesAttempted) : "-")</td><td>Total Strikes</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.TotalStrikesLanded, bs.TotalStrikesAttempted) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.TakedownsLanded, rs.TakedownsAttempted) : "-")</td><td>Takedowns</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.TakedownsLanded, bs.TakedownsAttempted) : "-")</td></tr>
+                <tr><td>@(rs?.SubmissionsAttempted.ToString() ?? "-")</td><td>Submission Attempts</td><td>@(bs?.SubmissionsAttempted.ToString() ?? "-")</td></tr>
+                <tr><td>@(rs?.Reversals.ToString() ?? "-")</td><td>Reversals</td><td>@(bs?.Reversals.ToString() ?? "-")</td></tr>
+                <tr><td>@(rs != null ? Format.Clock(rs.ControlSeconds) : "-")</td><td>Control Time</td><td>@(bs != null ? Format.Clock(bs.ControlSeconds) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.SigHeadStrikesLanded, rs.SigHeadStrikesAttempted) : "-")</td><td>Sig. Strikes to the Head</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.SigHeadStrikesLanded, bs.SigHeadStrikesAttempted) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.SigBodyStrikesLanded, rs.SigBodyStrikesAttempted) : "-")</td><td>Sig. Strikes to the Body</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.SigBodyStrikesLanded, bs.SigBodyStrikesAttempted) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.SigLegStrikesLanded, rs.SigLegStrikesAttempted) : "-")</td><td>Sig. Strikes to the Legs</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.SigLegStrikesLanded, bs.SigLegStrikesAttempted) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.SigDistanceStrikesLanded, rs.SigDistanceStrikesAttempted) : "-")</td><td>Sig. Strikes at Distance</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.SigDistanceStrikesLanded, bs.SigDistanceStrikesAttempted) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.SigClinchStrikesLanded, rs.SigClinchStrikesAttempted) : "-")</td><td>Sig. Strikes in the Clinch</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.SigClinchStrikesLanded, bs.SigClinchStrikesAttempted) : "-")</td></tr>
+                <tr><td>@(rs != null ? FightDetailModel.LandedOf(rs.SigGroundStrikesLanded, rs.SigGroundStrikesAttempted) : "-")</td><td>Sig. Strikes on the Ground</td><td>@(bs != null ? FightDetailModel.LandedOf(bs.SigGroundStrikesLanded, bs.SigGroundStrikesAttempted) : "-")</td></tr>
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (Model.Scorecards.Count > 0)
+{
+    <h2 class="stats-section-title">Scorecards</h2>
+    <div class="table-card">
+        <table class="table">
+            <thead>
+                <tr><th>@redName</th><th>Judge</th><th>@blueName</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var (judge, redScore, blueScore) in Model.Scorecards)
+                {
+                    <tr><td>@(redScore?.ToString() ?? "-")</td><td>@judge</td><td>@(blueScore?.ToString() ?? "-")</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (red != null && blue != null)
+{
+    <h2 class="stats-section-title">Tale of the Tape</h2>
+    <div class="table-card section-card">
+        <table class="table tape-table">
+            <thead>
+                <tr><th>@redName</th><th></th><th>@blueName</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>@Format.Text(red.Record)</td><th>Pro record now</th><td>@Format.Text(blue.Record)</td></tr>
+                <tr><td>@(red.AgeOn(Model.FightDate)?.ToString() ?? Format.Missing)</td><th>Age at the fight</th><td>@(blue.AgeOn(Model.FightDate)?.ToString() ?? Format.Missing)</td></tr>
+                <tr><td>@Format.Height(red.HeightInches)</td><th>Height</th><td>@Format.Height(blue.HeightInches)</td></tr>
+                <tr><td>@Format.Inches(red.ReachInches)</td><th>Reach</th><td>@Format.Inches(blue.ReachInches)</td></tr>
+                <tr><td>@Format.Text(red.Stance)</td><th>Stance</th><td>@Format.Text(blue.Stance)</td></tr>
+                <tr><td>@Format.Text(red.Born)</td><th>Born</th><td>@Format.Text(blue.Born)</td></tr>
+            </tbody>
+        </table>
+    </div>
+}

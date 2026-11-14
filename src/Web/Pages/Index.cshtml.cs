@@ -25,8 +25,8 @@ public class IndexModel : PageModel
         // collected, not today; otherwise a deployed copy would go blank as time passes.
         DateTime from = DataDate < DateTime.UtcNow.Date ? DataDate : DateTime.UtcNow.Date;
         NextEvent = await _db.Events
-            .Where(e => e.EventDate != null && e.EventDate > from && e.Status == "scheduled")
-            .OrderBy(e => e.EventDate)
+            .Where(e => e.Status == "Upcoming" && e.StartTime > from && e.Fights.Any())
+            .OrderBy(e => e.StartTime)
             .FirstOrDefaultAsync();
     }
 }

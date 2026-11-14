@@ -33,30 +33,30 @@ public class EventsModel : PageModel
         SelectedSort = sort == "asc" ? "asc" : "desc";
 
         Years = await _db.Events
-            .Where(e => e.EventDate != null)
-            .Select(e => e.EventDate!.Value.Year)
+            .Where(e => e.Date != null)
+            .Select(e => e.Date!.Value.Year)
             .Distinct()
             .OrderByDescending(y => y)
             .ToListAsync();
 
-        var query = _db.Events.AsQueryable();
+        var query = _db.Events.Where(e => e.Date != null);
 
         if (SelectedYear.HasValue)
         {
-            query = query.Where(e => e.EventDate != null && e.EventDate.Value.Year == SelectedYear.Value);
+            query = query.Where(e => e.Date!.Value.Year == SelectedYear.Value);
         }
 
         if (type == "numbered")
         {
-            query = query.Where(e => e.Title != null && !e.Title.Contains("Fight Night"));
+            query = query.Where(e => !e.Name.Contains("Fight Night"));
         }
         else if (type == "fightnight")
         {
-            query = query.Where(e => e.Title != null && e.Title.Contains("Fight Night"));
+            query = query.Where(e => e.Name.Contains("Fight Night"));
         }
 
         Events = SelectedSort == "asc"
-            ? await query.OrderBy(e => e.EventDate).ThenBy(e => e.CreatedAt).ToListAsync()
-            : await query.OrderByDescending(e => e.EventDate).ThenByDescending(e => e.CreatedAt).ToListAsync();
+            ? await query.OrderBy(e => e.Date).ThenBy(e => e.Id).ToListAsync()
+            : await query.OrderByDescending(e => e.Date).ThenByDescending(e => e.Id).ToListAsync();
     }
 }

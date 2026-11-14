@@ -45,7 +45,7 @@
                 <th>Nickname</th>
                 <th>Division</th>
                 <th>Record</th>
-                <th>Status</th>
+                <th>Born</th>
             </tr>
         </thead>
         <tbody>
@@ -54,21 +54,17 @@
                 <tr>
                     <td>
                         <a asp-page="/FighterDetail" asp-route-slug="@fighter.Slug" class="fighter-link">
-                            @if (fighter.ChampionStatus == "champion")
+                            @if (Model.Ranks.TryGetValue(fighter.Id, out int rank))
                             {
-                                <span class="rank-badge">C</span>
-                            }
-                            else if (fighter.Rank != null)
-                            {
-                                <span class="rank-badge">#@fighter.Rank</span>
+                                <span class="rank-badge">@(rank == 0 ? "C" : $"#{rank}")</span>
                             }
                             @fighter.Name
                         </a>
                     </td>
-                    <td>@Format.Nickname(fighter.Nickname)</td>
-                    <td>@fighter.Division</td>
-                    <td>@fighter.RecordText</td>
-                    <td>@(fighter.IsActive ? "Active" : "Inactive")</td>
+                    <td>@Format.Nickname(fighter.NickName)</td>
+                    <td>@Format.Text(fighter.WeightClass)</td>
+                    <td>@Format.Text(fighter.Record)</td>
+                    <td>@Format.Text(fighter.BornCountry)</td>
                 </tr>
             }
         </tbody>

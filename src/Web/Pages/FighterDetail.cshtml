@@ -1,45 +1,58 @@
 @page "{slug}"
 @model Web.Pages.FighterDetailModel
 @{
-    ViewData["Title"] = Model.FighterData.Name ?? "Fighter";
+    ViewData["Title"] = Model.FighterData.Name;
     ViewData["HideBackground"] = true;
+    var fighter = Model.FighterData;
+    var bio = fighter.Bio;
+    var career = Model.Career;
 }
 
 <a asp-page="/Fighters" class="back-link">&larr; Back to Fighters</a>
 
 <div class="fighter-header">
     <h1>
-        @if (Model.FighterData.Rank != null)
+        @if (Model.Rank is int rank && rank > 0)
         {
-            <span class="rank-badge">#@Model.FighterData.Rank</span>
+            <span class="rank-badge">#@rank</span>
         }
-        @Model.FighterData.Name
+        @fighter.Name
     </h1>
-    @if (Format.Nickname(Model.FighterData.Nickname) is string nickname)
+    @if (Format.Nickname(fighter.NickName) is string nickname)
     {
         <p class="fighter-nickname">@nickname</p>
     }
     <p class="fighter-meta">
-        @Model.FighterData.Division
-        @if (!string.IsNullOrWhiteSpace(Model.FighterData.ChampionStatus) && Model.FighterData.ChampionStatus != "none")
+        @Format.Text(fighter.WeightClass)
+        @if (Model.Rank == 0)
         {
             <span class="champion-badge">Champion</span>
         }
-        &middot; @(Model.FighterData.IsActive ? "Active" : Format.Status(Model.FighterData.Status) is var s && s != Format.Missing ? s : "Inactive")
+        &middot; @(bio?.Status ?? (Model.IsActive ? "Active" : "Inactive"))
     </p>
-    <a asp-page="/DreamFight" asp-route-a="@Model.FighterData.Slug" class="btn btn-primary btn-sm">Dream fight with @Model.FighterData.Name</a>
+    <a asp-page="/DreamFight" asp-route-a="@fighter.Slug" class="btn btn-primary btn-sm">Dream fight with @fighter.Name</a>
 </div>
 
-@* Ages stopped updating on UFC.com for many fighters who aren't active, so only active fighters' ages are shown. *@
 <div class="fighter-bio-grid">
-    <div class="bio-tile"><span class="bio-label">Record</span><span class="bio-value">@Format.Text(Model.FighterData.RecordText)</span></div>
-    <div class="bio-tile"><span class="bio-label">Age</span><span class="bio-value">@(Model.FighterData.IsActive ? Model.FighterData.Age?.ToString() ?? Format.Missing : Format.Missing)</span></div>
-    <div class="bio-tile"><span class="bio-label">Height</span><span class="bio-value">@Format.Height(Model.FighterData.HeightInches)</span></div>
-    <div class="bio-tile"><span class="bio-label">Reach</span><span class="bio-value">@Format.Inches(Model.FighterData.ReachInches)</span></div>
-    <div class="bio-tile"><span class="bio-label">Weight</span><span class="bio-value">@Format.Pounds(Model.FighterData.WeightLbs)</span></div>
-    <div class="bio-tile"><span class="bio-label">Stance</span><span class="bio-value">@Format.Text(Model.FighterData.Stance)</span></div>
-    <div class="bio-tile"><span class="bio-label">Country</span><span class="bio-value">@Format.Text(Model.FighterData.Country)</span></div>
-    <div class="bio-tile"><span class="bio-label">Fighting Style</span><span class="bio-value">@Format.Text(Model.FighterData.FightingStyle)</span></div>
+    <div class="bio-tile"><span class="bio-label">Pro record</span><span class="bio-value">@Format.Text(fighter.Record)</span></div>
+    <div class="bio-tile"><span class="bio-label">Age</span><span class="bio-value">@(Model.Age?.ToString() ?? Format.Missing)</span></div>
+    <div class="bio-tile"><span class="bio-label">Height</span><span class="bio-value">@Format.Height(fighter.HeightInches)</span></div>
+    <div class="bio-tile"><span class="bio-label">Reach</span><span class="bio-value">@Format.Inches(fighter.ReachInches)</span></div>
+    <div class="bio-tile"><span class="bio-label">Weight</span><span class="bio-value">@Format.Pounds(fighter.WeightLbs)</span></div>
+    <div class="bio-tile"><span class="bio-label">Stance</span><span class="bio-value">@Format.Text(fighter.Stance)</span></div>
+    <div class="bio-tile"><span class="bio-label">Born</span><span class="bio-value">@Format.Text(fighter.Born)</span></div>
+    @if (bio?.TrainsAt != null)
+    {
+        <div class="bio-tile"><span class="bio-label">Trains at</span><span class="bio-value">@bio.TrainsAt</span></div>
+    }
+    @if (bio?.FightingStyle != null)
+    {
+        <div class="bio-tile"><span class="bio-label">Fighting Style</span><span class="bio-value">@bio.FightingStyle</span></div>
+    }
+    @if (bio?.OctagonDebut != null)
+    {
+        <div class="bio-tile"><span class="bio-label">Octagon Debut</span><span class="bio-value">@Format.Date(bio.OctagonDebut)</span></div>
+    }
 </div>
 
 @if (Model.FightHistory.Count > 0)
@@ -51,33 +64,33 @@
                 <tr><th>Result</th><th>Opponent</th><th>Method</th><th>Event</th><th>Date</th></tr>
             </thead>
             <tbody>
-                @foreach (var (bout, ev) in Model.FightHistory)
+                @foreach (var fight in Model.FightHistory)
                 {
-                    var side = Model.Side(bout);
+                    var side = Model.Side(fight);
                     <tr>
                         <td><span class="result-text @side.Result.ToLower().Replace(" ", "-")">@side.Result</span></td>
                         <td>
-                            @if (side.OpponentSlug != null)
+                            @if (side.Opponent != null)
                             {
-                                <a asp-page="/FighterDetail" asp-route-slug="@side.OpponentSlug" class="fighter-link">@side.Opponent</a>
+                                <a asp-page="/FighterDetail" asp-route-slug="@side.Opponent.Slug" class="fighter-link">@side.Opponent.Name</a>
                             }
                             else
                             {
-                                @Format.Text(side.Opponent)
+                                <text>TBD</text>
                             }
                         </td>
                         <td>
-                            @if (bout.Status == "completed")
+                            @if (fight.IsFinished)
                             {
-                                <a asp-page="/BoutDetail" asp-route-id="@bout.Id" asp-route-eventSlug="@ev.Slug" class="fighter-link">@Format.Text(bout.Method)@(bout.ResultRound != null ? $" (R{bout.ResultRound})" : "")</a>
+                                <a asp-page="/FightDetail" asp-route-id="@fight.Id" class="fighter-link">@fight.Result</a>
                             }
                             else
                             {
                                 @Format.Missing
                             }
                         </td>
-                        <td><a asp-page="/EventDetail" asp-route-slug="@ev.Slug" class="fighter-link">@ev.Title</a></td>
-                        <td class="nowrap">@(ev.EventDate?.ToString("MMM d, yyyy") ?? Format.Missing)</td>
+                        <td><a asp-page="/EventDetail" asp-route-id="@fight.EventId" class="fighter-link">@fight.Event?.Name</a></td>
+                        <td class="nowrap">@Format.Date(fight.Event?.Date)</td>
                     </tr>
                 }
             </tbody>
@@ -89,7 +102,7 @@
 {
     <div class="charts-row">
         <div class="chart-card">
-            <h5>Win Method</h5>
+            <h5>UFC Wins by Method</h5>
             <div class="donut" style="background: conic-gradient(@Html.Raw(Model.WinMethodChartCss))"></div>
             <ul class="chart-legend">
                 @foreach (var item in Model.WinMethodLegend)
@@ -101,13 +114,9 @@
     </div>
 }
 
-@{
-    var stats = Model.FighterData.Stats;
-}
-
-@if (Model.SummaryStats.Count > 0 || stats != null)
+@if (Model.SummaryStats.Count > 0 || career != null)
 {
-    <h2 class="stats-section-title">Stats &amp; Records</h2>
+    <h2 class="stats-section-title">UFC Stats</h2>
 }
 
 @if (Model.SummaryStats.Count > 0)
@@ -123,31 +132,31 @@
     </div>
 }
 
-@if (stats != null)
+@if (career != null)
 {
     <div class="charts-row">
         <div class="chart-card accuracy-card">
             <div class="radial-progress" style="background: conic-gradient(@Html.Raw(Model.StrikingAccuracyGradient))">
-                <span class="radial-progress-value">@Web.Pages.FighterDetailModel.FormatPercent(stats.StrikingAccuracy)</span>
+                <span class="radial-progress-value">@Format.Percent(career.StrikingAccuracy)</span>
             </div>
             <div>
                 <h5>Striking Accuracy</h5>
                 <ul class="accuracy-card-stats">
-                    <li>Sig. Strikes Landed: @stats.SigStrikesLanded</li>
-                    <li>Sig. Strikes Attempted: @stats.SigStrikesAttempted</li>
+                    <li>Sig. Strikes Landed: @career.SigLanded</li>
+                    <li>Sig. Strikes Attempted: @career.SigAttempted</li>
                 </ul>
             </div>
         </div>
 
         <div class="chart-card accuracy-card">
             <div class="radial-progress" style="background: conic-gradient(@Html.Raw(Model.TakedownAccuracyGradient))">
-                <span class="radial-progress-value">@Web.Pages.FighterDetailModel.FormatPercent(stats.TakedownAccuracy)</span>
+                <span class="radial-progress-value">@Format.Percent(career.TakedownAccuracy)</span>
             </div>
             <div>
                 <h5>Takedown Accuracy</h5>
                 <ul class="accuracy-card-stats">
-                    <li>Takedowns Landed: @stats.TakedownsLanded</li>
-                    <li>Takedowns Attempted: @stats.TakedownsAttempted</li>
+                    <li>Takedowns Landed: @career.TakedownsLanded</li>
+                    <li>Takedowns Attempted: @career.TakedownsAttempted</li>
                 </ul>
             </div>
         </div>
@@ -157,27 +166,27 @@
         <div class="chart-card performance-card">
             <h5>Offensive Stats</h5>
             <div class="metric-grid">
-                <div class="metric"><span class="count">@stats.SigStrikesLandedPerMin.ToString("0.00")</span><span class="label">Sig Str Landed/Min</span></div>
-                <div class="metric"><span class="count">@stats.TakedownAvgPer15Min.ToString("0.00")</span><span class="label">Takedown Avg</span></div>
-                <div class="metric"><span class="count">@stats.SubmissionAvgPer15Min.ToString("0.00")</span><span class="label">Submission Avg</span></div>
-                <div class="metric"><span class="count">@stats.KnockdownAvg.ToString("0.00")</span><span class="label">Knockdown Avg</span></div>
+                <div class="metric"><span class="count">@career.SigLandedPerMinute.ToString("0.00")</span><span class="label">Sig Str Landed/Min</span></div>
+                <div class="metric"><span class="count">@career.TakedownsPer15.ToString("0.00")</span><span class="label">Takedowns/15 Min</span></div>
+                <div class="metric"><span class="count">@career.SubmissionsPer15.ToString("0.00")</span><span class="label">Sub Attempts/15 Min</span></div>
+                <div class="metric"><span class="count">@career.KnockdownsPer15.ToString("0.00")</span><span class="label">Knockdowns/15 Min</span></div>
             </div>
         </div>
 
         <div class="chart-card performance-card">
             <h5>Defensive Stats</h5>
             <div class="metric-grid">
-                <div class="metric"><span class="count">@stats.SigStrikesAbsorbedPerMin.ToString("0.00")</span><span class="label">Sig Str Absorbed/Min</span></div>
-                <div class="metric"><span class="count">@Web.Pages.FighterDetailModel.FormatPercent(stats.SigStrikesDefense)</span><span class="label">Sig Str Defense</span></div>
-                <div class="metric"><span class="count">@Web.Pages.FighterDetailModel.FormatPercent(stats.TakedownDefense)</span><span class="label">Takedown Defense</span></div>
-                <div class="metric"><span class="count">@Web.Pages.FighterDetailModel.FormatFightTime(stats.AverageFightTimeSeconds)</span><span class="label">Avg Fight Time</span></div>
+                <div class="metric"><span class="count">@career.SigAbsorbedPerMinute.ToString("0.00")</span><span class="label">Sig Str Absorbed/Min</span></div>
+                <div class="metric"><span class="count">@Format.Percent(career.StrikingDefense)</span><span class="label">Sig Str Defense</span></div>
+                <div class="metric"><span class="count">@Format.Percent(career.TakedownDefense)</span><span class="label">Takedown Defense</span></div>
+                <div class="metric"><span class="count">@Format.Clock(career.AverageFightSeconds)</span><span class="label">Avg Fight Time</span></div>
             </div>
         </div>
     </div>
 
     <div class="charts-row">
         <div class="table-card stat-bars">
-            <h5>Strikes by Position</h5>
+            <h5>Sig. Strikes by Position</h5>
             @foreach (var item in Model.StrikePositionBreakdown)
             {
                 <div class="stat-bar-row">
@@ -185,13 +194,13 @@
                     <div class="stat-bar-track">
                         <div class="stat-bar-fill" style="width: @((item.Percent * 100).ToString("0.##"))%"></div>
                     </div>
-                    <span class="stat-bar-value">@((item.Percent * 100).ToString("0"))%</span>
+                    <span class="stat-bar-value">@Format.Percent(item.Percent)</span>
                 </div>
             }
         </div>
 
         <div class="table-card stat-bars">
-            <h5>Strikes by Target</h5>
+            <h5>Sig. Strikes by Target</h5>
             @foreach (var item in Model.StrikeTargetBreakdown)
             {
                 <div class="stat-bar-row">
@@ -199,9 +208,10 @@
                     <div class="stat-bar-track">
                         <div class="stat-bar-fill" style="width: @((item.Percent * 100).ToString("0.##"))%"></div>
                     </div>
-                    <span class="stat-bar-value">@((item.Percent * 100).ToString("0"))%</span>
+                    <span class="stat-bar-value">@Format.Percent(item.Percent)</span>
                 </div>
             }
         </div>
     </div>
+    <p class="reasons-note">Over @career.Fights UFC fight@(career.Fights == 1 ? "" : "s") with stats (@Format.Clock(career.Seconds) of fight time).</p>
 }

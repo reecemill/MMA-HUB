@@ -40,9 +40,9 @@ public class DreamFightModel : PageModel
     public async Task OnGetAsync(string? a, string? b)
     {
         List<Fighter> fighters = (await _db.Fighters.AsNoTracking()
-                .Select(f => new Fighter { Id = f.Id, Name = f.Name, Slug = f.Slug, Division = f.Division })
+                .Select(f => new Fighter { Id = f.Id, FirstName = f.FirstName, LastName = f.LastName, Slug = f.Slug, WeightClass = f.WeightClass })
                 .ToListAsync())
-            .Where(f => f.Name != null && _predictor.Profile(f.Slug)?.Fights > 0)
+            .Where(f => f.Name.Length > 0 && _predictor.Profile(f.Slug)?.Fights > 0)
             .ToList();
 
         // Same-named fighters get the one with more UFC fights for the bare name.
@@ -50,15 +50,15 @@ public class DreamFightModel : PageModel
         foreach (Fighter f in fighters.OrderByDescending(f => _predictor.Profile(f.Slug)!.Fights))
         {
             byLabel.TryAdd(Label(f), f);
-            byLabel.TryAdd(f.Name!, f);
+            byLabel.TryAdd(f.Name, f);
         }
         Options = fighters.Select(Label).Distinct().OrderBy(l => l).ToList();
 
-        Dictionary<string, Fighter> bySlug = fighters.ToDictionary(f => f.Slug!);
+        Dictionary<string, Fighter> bySlug = fighters.ToDictionary(f => f.Slug);
         foreach (var (x, y) in Examples)
         {
-            if (bySlug.TryGetValue(x, out Fighter? fx)) ExampleNames[x] = fx.Name!;
-            if (bySlug.TryGetValue(y, out Fighter? fy)) ExampleNames[y] = fy.Name!;
+            if (bySlug.TryGetValue(x, out Fighter? fx)) ExampleNames[x] = fx.Name;
+            if (bySlug.TryGetValue(y, out Fighter? fy)) ExampleNames[y] = fy.Name;
         }
 
         if (string.IsNullOrWhiteSpace(a) && string.IsNullOrWhiteSpace(b)) return;
@@ -96,7 +96,7 @@ public class DreamFightModel : PageModel
     }
 
     public static string Label(Fighter f) =>
-        string.IsNullOrWhiteSpace(f.Division) ? f.Name! : $"{f.Name} ({f.Division})";
+        string.IsNullOrWhiteSpace(f.WeightClass) ? f.Name : $"{f.Name} ({f.WeightClass})";
 
     // Bar width for a reason, relative to the biggest one shown.
     public double ReasonWidth(Reason r) =>

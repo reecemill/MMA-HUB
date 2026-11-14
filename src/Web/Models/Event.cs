@@ -1,107 +1,141 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
 namespace Web.Models;
 
+// The scraper's UFC.com tables (src/Scraper/UfcCom/UfcComEntities.cs), as the site reads
+// them. Only the columns the site, the snapshot, or the model use are mapped here.
 public class Event
 {
-    public Guid Id { get; set; }
-    public string? Slug { get; set; }
-    public string? Title { get; set; }
-    public string? ShortTitle { get; set; }
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public DateTime? StartTime { get; set; }
+    // The date where the event took place; StartTime is in UTC.
+    public DateOnly? Date { get; set; }
     public string? Status { get; set; }
-    public DateTime? StartsAt { get; set; }
     public string? Venue { get; set; }
     public string? City { get; set; }
     public string? State { get; set; }
     public string? Country { get; set; }
-    public string? LocationText { get; set; }
-    public string? ImageUrl { get; set; }
-    public DateTime CreatedAt { get; set; }
-    public DateTime? LastSyncedAt { get; set; }
-    public string? DataId { get; set; }
-    public bool HasStats { get; set; }
-    public DateTime? DataFreshness { get; set; }
-    public string? FreshnessStatus { get; set; }
-    public double? DataAgeHours { get; set; }
-    public string? DataSource { get; set; }
-    public string? Warning { get; set; }
-    public DateTime? EventDate { get; set; }
-    public string? EventDateLabel { get; set; }
-    public string? EventWeekday { get; set; }
-    public string? EventTimeZone { get; set; }
-    public string? VenueTimeZone { get; set; }
-    public DateTime? VenueDate { get; set; }
-    public string? VenueDateLabel { get; set; }
-    public string? VenueWeekday { get; set; }
-    public string? RawJson { get; set; }
-    // Set by the scraper when Cito lists the same event twice; the site hides these.
-    public Guid? DuplicateOfEventId { get; set; }
-    public List<Bout> Bouts { get; set; } = [];
+    public List<Fight> Fights { get; set; } = [];
+
+    public bool IsUpcoming => Status == "Upcoming";
+
+    // UFC.com marks a few 1990s events "Over" rather than "Final".
+    public string StatusText => Status switch
+    {
+        "Final" or "Over" => "Completed",
+        null or "" => Format.Missing,
+        _ => Status,
+    };
+
+    public string? Location => Format.Join(City, State, Country);
 }
 
-public class Bout
+public class Fight
 {
-    public string Id { get; set; } = "";
-    public Guid EventId { get; set; }
-    public string? CardSection { get; set; }
-    public int? CardSectionOrder { get; set; }
-    public int? BoutOrder { get; set; }
-    public string? WeightClass { get; set; }
-    public bool TitleBout { get; set; }
+    public int Id { get; set; }
+    public int EventId { get; set; }
+    public Event? Event { get; set; }
+    public int? FightOrder { get; set; }
     public string? Status { get; set; }
-    public bool IsCancelled { get; set; }
-    public int? ResultRound { get; set; }
-    public string? ResultTime { get; set; }
+    public string? CardSegment { get; set; }
+    public string? WeightClass { get; set; }
+    public bool IsTitleFight { get; set; }
+    public int? ScheduledRounds { get; set; }
+    public string? Referee { get; set; }
+    public int? WinnerFighterId { get; set; }
     public string? Method { get; set; }
+    public int? EndingRound { get; set; }
+    public string? EndingTime { get; set; }
+    public int? DurationSeconds { get; set; }
+    public string? EndingStrike { get; set; }
+    public string? EndingTarget { get; set; }
+    public string? EndingPosition { get; set; }
+    public string? EndingSubmission { get; set; }
+    public bool FightOfTheNight { get; set; }
 
-    public Guid? Fighter1Id { get; set; }
-    public string? Fighter1Slug { get; set; }
-    public string? Fighter1Name { get; set; }
-    public string? Fighter1Corner { get; set; }
-    public string? Fighter1Outcome { get; set; }
-    public Fighter? Fighter1 { get; set; }
+    public List<FightFighter> Fighters { get; set; } = [];
+    public List<FightStats> Stats { get; set; } = [];
+    public List<FightScore> Scores { get; set; } = [];
 
-    public Guid? Fighter2Id { get; set; }
-    public string? Fighter2Slug { get; set; }
-    public string? Fighter2Name { get; set; }
-    public string? Fighter2Corner { get; set; }
-    public string? Fighter2Outcome { get; set; }
-    public Fighter? Fighter2 { get; set; }
+    public bool IsFinished => Status is "Final" or "Over";
 
-    public Guid? WinnerFighterId { get; set; }
-    // Set by the scraper when this fight is also listed on an earlier event.
-    public string? DuplicateOfBoutId { get; set; }
+    // UFC.com lists the red corner first: the champion, or the higher-billed fighter.
+    public FightFighter? Red => Fighters.FirstOrDefault(f => f.Corner == "Red");
+    public FightFighter? Blue => Fighters.FirstOrDefault(f => f.Corner == "Blue");
 
-    public List<BoutFighterStats> Stats { get; set; } = [];
+    public string CardSection => CardSegment switch
+    {
+        "Main" => "Main Card",
+        "Prelims1" => "Prelims",
+        "Prelims2" => "Early Prelims",
+        _ => "Card",
+    };
+
+    public int CardSectionOrder => CardSegment switch { "Main" => 0, "Prelims1" => 1, "Prelims2" => 2, _ => 3 };
+
+    // "KO/TKO (R2)"
+    public string Result => (Method ?? Format.Missing) + (EndingRound != null ? $" (R{EndingRound})" : "");
+
+    // How a finish happened: "Punches to the head, from mount" or "Rear Naked Choke, from back control".
+    public string? Ending
+    {
+        get
+        {
+            string? position = EndingPosition?.ToLowerInvariant();
+            string? what = EndingSubmission
+                ?? (EndingStrike != null ? EndingStrike + (EndingTarget != null ? $" to the {EndingTarget.ToLowerInvariant()}" : "") : null);
+            return what == null ? null : position == null ? what : $"{what}, {position}";
+        }
+    }
+
+    public FightStats? StatsFor(int? fighterId) => Stats.FirstOrDefault(s => s.FighterId == fighterId);
 }
 
-public class BoutFighterStats
+public class FightFighter
 {
-    public string Id { get; set; } = "";
-    public string BoutId { get; set; } = "";
-    public Guid? FighterId { get; set; }
-    public string? FighterSlug { get; set; }
+    public int FightId { get; set; }
+    public Fight? Fight { get; set; }
+    public int FighterId { get; set; }
+    public Fighter? Fighter { get; set; }
+    public string? Corner { get; set; }
+    // "Win", "Loss", "Draw", or "No Contest"; null until the fight happens.
+    public string? Outcome { get; set; }
+}
+
+// One fighter's numbers for a whole fight. Times are in seconds.
+public class FightStats
+{
+    public int FightId { get; set; }
+    public int FighterId { get; set; }
     public int Knockdowns { get; set; }
-    public int SigStrikesLanded { get; set; }
-    public int SigStrikesAttempted { get; set; }
     public int TotalStrikesLanded { get; set; }
     public int TotalStrikesAttempted { get; set; }
+    public int SigStrikesLanded { get; set; }
+    public int SigStrikesAttempted { get; set; }
+    public int SigHeadStrikesLanded { get; set; }
+    public int SigHeadStrikesAttempted { get; set; }
+    public int SigBodyStrikesLanded { get; set; }
+    public int SigBodyStrikesAttempted { get; set; }
+    public int SigLegStrikesLanded { get; set; }
+    public int SigLegStrikesAttempted { get; set; }
+    public int SigDistanceStrikesLanded { get; set; }
+    public int SigDistanceStrikesAttempted { get; set; }
+    public int SigClinchStrikesLanded { get; set; }
+    public int SigClinchStrikesAttempted { get; set; }
+    public int SigGroundStrikesLanded { get; set; }
+    public int SigGroundStrikesAttempted { get; set; }
     public int TakedownsLanded { get; set; }
     public int TakedownsAttempted { get; set; }
-    public int SubmissionAttempts { get; set; }
+    public int SubmissionsAttempted { get; set; }
     public int Reversals { get; set; }
-    public string? ControlTime { get; set; }
-    public int HeadLanded { get; set; }
-    public int HeadAttempted { get; set; }
-    public int BodyLanded { get; set; }
-    public int BodyAttempted { get; set; }
-    public int LegLanded { get; set; }
-    public int LegAttempted { get; set; }
-    public int DistanceLanded { get; set; }
-    public int DistanceAttempted { get; set; }
-    public int ClinchLanded { get; set; }
-    public int ClinchAttempted { get; set; }
-    public int GroundLanded { get; set; }
-    public int GroundAttempted { get; set; }
+    public int ControlSeconds { get; set; }
+}
+
+// A judge's total for one fighter, on fights that went to the scorecards.
+public class FightScore
+{
+    public int FightId { get; set; }
+    public int JudgeId { get; set; }
+    public int FighterId { get; set; }
+    public string? JudgeName { get; set; }
+    public int? Score { get; set; }
 }

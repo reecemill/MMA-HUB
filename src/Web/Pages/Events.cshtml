@@ -46,7 +46,7 @@
     <table class="table">
         <thead>
             <tr>
-                <th>Title</th>
+                <th>Event</th>
                 <th>Status</th>
                 <th>Date</th>
                 <th>Venue</th>
@@ -57,11 +57,11 @@
             @foreach (var ev in Model.Events)
             {
                 <tr>
-                    <td><a asp-page="/EventDetail" asp-route-slug="@ev.Slug" class="fighter-link">@ev.Title</a></td>
-                    <td>@(string.IsNullOrEmpty(ev.Status) ? Format.Missing : char.ToUpper(ev.Status[0]) + ev.Status[1..])</td>
-                    <td>@(ev.EventDate?.ToString("MMM dd, yyyy") ?? ev.EventDateLabel ?? "-")</td>
-                    <td>@(ev.Venue ?? "-")</td>
-                    <td>@(ev.LocationText ?? ev.City ?? ev.Country ?? "-")</td>
+                    <td><a asp-page="/EventDetail" asp-route-id="@ev.Id" class="fighter-link">@ev.Name</a></td>
+                    <td>@ev.StatusText</td>
+                    <td class="nowrap">@Format.Date(ev.Date)</td>
+                    <td>@Format.Text(ev.Venue)</td>
+                    <td>@Format.Text(ev.Location)</td>
                 </tr>
             }
         </tbody>

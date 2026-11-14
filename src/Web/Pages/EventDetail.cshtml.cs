@@ -12,11 +12,11 @@ public class EventDetailModel : PageModel
     private readonly FightPredictor _predictor;
 
     public Event EventData { get; set; } = null!;
-    public List<IGrouping<string, Bout>> BoutsBySection { get; set; } = [];
+    public List<IGrouping<string, Fight>> FightsBySection { get; set; } = [];
 
-    // Upcoming bouts: the current model's prediction. Past bouts in the test years: what
-    // the held-out model picked before the fight. Both as P(fighter 1 wins).
-    public Dictionary<string, double> Predictions { get; set; } = [];
+    // Upcoming fights: the current model's prediction. Past fights in the test years: what
+    // the held-out model picked before the fight. Both as P(red corner wins).
+    public Dictionary<int, double> Predictions { get; set; } = [];
     public bool ShowsPastPicks { get; set; }
 
     public EventDetailModel(AppDbContext db, FightPredictor predictor)
@@ -25,12 +25,11 @@ public class EventDetailModel : PageModel
         _predictor = predictor;
     }
 
-    public async Task<IActionResult> OnGetAsync(string slug)
+    public async Task<IActionResult> OnGetAsync(int id)
     {
         Event? ev = await _db.Events
-            .Include(e => e.Bouts).ThenInclude(b => b.Fighter1)
-            .Include(e => e.Bouts).ThenInclude(b => b.Fighter2)
-            .FirstOrDefaultAsync(e => e.Slug == slug);
+            .Include(e => e.Fights).ThenInclude(f => f.Fighters).ThenInclude(ff => ff.Fighter)
+            .FirstOrDefaultAsync(e => e.Id == id);
 
         if (ev == null)
         {
@@ -39,33 +38,31 @@ public class EventDetailModel : PageModel
 
         EventData = ev;
 
-        BoutsBySection = ev.Bouts
-            .OrderBy(b => b.BoutOrder ?? int.MaxValue)
-            .GroupBy(b => b.CardSection ?? "Card")
-            .OrderBy(g => g.Min(b => b.CardSectionOrder ?? int.MaxValue))
+        FightsBySection = ev.Fights
+            .OrderBy(f => f.FightOrder ?? int.MaxValue)
+            .GroupBy(f => f.CardSection)
+            .OrderBy(g => g.Min(f => f.CardSectionOrder))
             .ToList();
 
-        foreach (Bout bout in ev.Bouts.Where(b => !b.IsCancelled))
+        DateTime date = ev.Date?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc) ?? _predictor.SnapshotDate;
+        foreach (Fight fight in ev.Fights)
         {
-            double? p = bout.Status == "completed"
-                ? _predictor.PastPrediction(bout.Id)
-                : _predictor.PredictBout(bout.Fighter1?.Slug, bout.Fighter2?.Slug, ev.EventDate ?? _predictor.SnapshotDate)
-                    ?.Fighter1WinProbability;
-            if (p.HasValue) Predictions[bout.Id] = p.Value;
+            double? p = fight.IsFinished
+                ? _predictor.PastPrediction(fight.Id)
+                : _predictor.PredictBout(fight.Red?.Fighter?.Slug, fight.Blue?.Fighter?.Slug, date)?.Fighter1WinProbability;
+            if (p.HasValue) Predictions[fight.Id] = p.Value;
         }
-        ShowsPastPicks = ev.Bouts.Any(b => b.Status == "completed" && Predictions.ContainsKey(b.Id));
+        ShowsPastPicks = ev.Fights.Any(f => f.IsFinished && Predictions.ContainsKey(f.Id));
 
         return Page();
     }
 
     // The favorite and their chance, and whether that pick was right once there's a result.
-    public (string Favorite, int Percent, bool? Correct)? Pick(Bout bout)
+    public (string Favorite, int Percent, bool? Correct)? Pick(Fight fight)
     {
-        if (!Predictions.TryGetValue(bout.Id, out double p1)) return null;
-        bool favorsFighter1 = p1 >= 0.5;
-        string name = (favorsFighter1 ? bout.Fighter1Name ?? bout.Fighter1?.Name : bout.Fighter2Name ?? bout.Fighter2?.Name) ?? "TBD";
-        Guid? favoriteId = favorsFighter1 ? bout.Fighter1Id : bout.Fighter2Id;
-        bool? correct = bout.WinnerFighterId.HasValue ? bout.WinnerFighterId == favoriteId : null;
-        return (name, (int)Math.Round(Math.Max(p1, 1 - p1) * 100), correct);
+        if (!Predictions.TryGetValue(fight.Id, out double pRed)) return null;
+        FightFighter? favorite = pRed >= 0.5 ? fight.Red : fight.Blue;
+        bool? correct = fight.WinnerFighterId.HasValue ? fight.WinnerFighterId == favorite?.FighterId : null;
+        return (favorite?.Fighter?.Name ?? "TBD", (int)Math.Round(Math.Max(pRed, 1 - pRed) * 100), correct);
     }
 }

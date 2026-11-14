@@ -12,10 +12,10 @@
 
 @if (Model.NextEvent != null)
 {
-    <a asp-page="/EventDetail" asp-route-slug="@Model.NextEvent.Slug" class="card text-center next-event card-link">
+    <a asp-page="/EventDetail" asp-route-id="@Model.NextEvent.Id" class="card text-center next-event card-link">
         <h5>Next Event <span class="as-of">as of @Model.DataDate.ToString("MMM d, yyyy")</span></h5>
-        <div class="next-event-title">@Model.NextEvent.Title</div>
-        <div class="next-event-date">@Model.NextEvent.EventDate?.ToString("MMM dd, yyyy")</div>
+        <div class="next-event-title">@Model.NextEvent.Name</div>
+        <div class="next-event-date">@Format.Date(Model.NextEvent.Date)</div>
         @if (!string.IsNullOrWhiteSpace(Model.NextEvent.Venue))
         {
             <div class="next-event-venue">@Model.NextEvent.Venue</div>

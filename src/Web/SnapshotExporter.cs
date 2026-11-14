@@ -21,27 +21,15 @@ public static class SnapshotExporter
         await target.Database.EnsureCreatedAsync();
         target.ChangeTracker.AutoDetectChangesEnabled = false;
 
-        // RawJson is the scraper's copy of each API response; no page reads it, and
-        // it's most of the database's size.
-        List<Fighter> fighters = await source.Fighters.AsNoTracking().ToListAsync();
-        fighters.ForEach(f => f.RawJson = null);
-        List<Event> events = await source.Events.AsNoTracking().ToListAsync();
-        events.ForEach(e => e.RawJson = null);
-
-        await CopyAsync(target, fighters);
-        await CopyAsync(target, await source.FighterHeroStats.AsNoTracking().ToListAsync());
-        await CopyAsync(target, await source.FighterStats.AsNoTracking().ToListAsync());
-        await CopyAsync(target, events);
-
-        // The query filters leave out duplicate events and bouts; also leave out the
-        // bouts on those duplicate events, which would otherwise point at nothing.
-        HashSet<Guid> eventIds = events.Select(e => e.Id).ToHashSet();
-        List<Bout> bouts = (await source.Bouts.AsNoTracking().ToListAsync())
-            .Where(b => eventIds.Contains(b.EventId)).ToList();
-        HashSet<string> boutIds = bouts.Select(b => b.Id).ToHashSet();
-        await CopyAsync(target, bouts);
-        await CopyAsync(target, (await source.BoutFighterStats.AsNoTracking().ToListAsync())
-            .Where(s => boutIds.Contains(s.BoutId)).ToList());
+        // Parents before children, since the SQLite file enforces the foreign keys.
+        await CopyAsync(target, await source.Events.AsNoTracking().ToListAsync());
+        await CopyAsync(target, await source.Fighters.AsNoTracking().ToListAsync());
+        await CopyAsync(target, await source.FighterBios.AsNoTracking().ToListAsync());
+        await CopyAsync(target, await source.Fights.AsNoTracking().ToListAsync());
+        await CopyAsync(target, await source.FightFighters.AsNoTracking().ToListAsync());
+        await CopyAsync(target, await source.FightStats.AsNoTracking().ToListAsync());
+        await CopyAsync(target, await source.FightScores.AsNoTracking().ToListAsync());
+        await CopyAsync(target, await source.Rankings.AsNoTracking().ToListAsync());
 
         Console.WriteLine($"Wrote {fullPath} ({new FileInfo(fullPath).Length / 1024 / 1024} MB)");
     }
