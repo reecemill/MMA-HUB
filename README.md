@@ -69,6 +69,13 @@ dotnet run
 dotnet run -- --offline          # rebuild the tables from the saved files, no downloads
 dotnet run -- --all-athletes     # also every fighter's ufc.com page (about 12 hours the first time)
 
+# Weekly scrape (macOS): runs the scraper every Monday at 12:00 AM; a Mac that's asleep
+# then runs it on waking. Keep the repo out of ~/Desktop, ~/Documents and ~/Downloads:
+# macOS doesn't let scheduled jobs read those folders.
+cd ../..
+scripts/schedule-scrape.sh install   # also: uninstall, run (now), status
+cd src/Scraper
+
 # Web
 cd ../Web
 dotnet user-secrets set "ConnectionStrings:MmaDb" "Host=localhost;Database=mma;Username=...;Password=..."
@@ -83,7 +90,13 @@ ml/.venv/bin/python ml/train.py                 # --dry-run: print the compariso
 
 ## Public demo
 
-The demo is a Docker Space on Hugging Face running the site against `data/mma.db`. To update it after changing code, data, or the model:
+The demo is a Docker Space on Hugging Face running the site against `data/mma.db`. To scrape, export, retrain, commit everything, push to GitHub and deploy in one go:
+
+```bash
+scripts/update-site.sh              # --no-scrape, --yes, or a commit message
+```
+
+Or step by step, after changing code, data, or the model:
 
 ```bash
 docker build -t mma-hub . && docker run -p 7860:7860 mma-hub   # optional: check it locally

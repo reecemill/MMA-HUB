@@ -496,3 +496,6 @@ PlanForMmaSite.rtf
 # Model training environment and its check output
 ml/.venv/
 ml/reference_predictions.json
+
+# Trained models (rebuilt by: ml/.venv/bin/python -m ml.v2 winner)
+ml/models/
