@@ -58,6 +58,10 @@ PER_FIGHTER = {
     "head_share": "Share of significant strikes landed to the head",
     "finish_rate": "KO/TKO and submission wins per UFC fight",
     "ko_loss_rate": "KO/TKO losses per UFC fight",
+    "ko_rate": "KO/TKO wins per UFC fight",
+    "sub_rate": "Submission wins per UFC fight",
+    "sub_loss_rate": "Submission losses per UFC fight",
+    "dec_rate": "Share of UFC fights that went to a decision",
     "round_share": "Share of rounds won on the judges' scorecards",
     "last3": "Recent form (last three results)",
     "log_layoff": "Time since their last UFC fight",
@@ -90,14 +94,15 @@ class FeatureParams:
 
 class FighterState:
     """Everything known about one fighter from their UFC fights so far."""
-    __slots__ = ("fights", "results", "ko_wins", "sub_wins", "ko_losses", "last_date", "off_ko_loss",
+    __slots__ = ("fights", "results", "ko_wins", "sub_wins", "ko_losses", "sub_losses", "decisions", "last_date", "off_ko_loss",
                  "cage_seconds", "own", "against", "rounds_won", "rounds_scored", "five_round",
                  "last_class", "misses")
 
     def __init__(self):
         self.fights = 0
         self.results = []           # 1 win, 0.5 draw, 0 loss; no contests aren't results
-        self.ko_wins = self.sub_wins = self.ko_losses = 0
+        self.ko_wins = self.sub_wins = self.ko_losses = self.sub_losses = 0
+        self.decisions = 0
         self.last_date = None
         self.off_ko_loss = 0.0
         self.cage_seconds = 0.0     # every finished fight, with stats or not
@@ -245,6 +250,11 @@ def fighter_features(st, info, rating, rd, prior, shrink, date, weight_class):
         **stats,
         "finish_rate": (st.ko_wins + st.sub_wins) / (n + 1),
         "ko_loss_rate": st.ko_losses / (n + 1),
+        "ko_rate": st.ko_wins / (n + 1),
+        "sub_rate": st.sub_wins / (n + 1),
+        "sub_loss_rate": st.sub_losses / (n + 1),
+        # Smoothed toward the long-run share of UFC fights that go the distance (about 45%).
+        "dec_rate": (st.decisions + 0.45) / (n + 1),
         # Smoothed toward an even split, so a fighter with few scored rounds sits near 50%.
         "round_share": (st.rounds_won + 1.5) / (st.rounds_scored + 3),
         "last3": (sum(last3) + 1) / (len(last3) + 2),
@@ -333,6 +343,8 @@ def build(dataset, params):
                 st.ko_wins += won_it and f.method_group == "ko"
                 st.sub_wins += won_it and f.method_group == "sub"
                 st.ko_losses += lost_it and f.method_group == "ko"
+                st.sub_losses += lost_it and f.method_group == "sub"
+                st.decisions += f.method_group == "dec"
                 st.off_ko_loss = float(lost_it and f.method_group == "ko")
                 st.five_round += f.ScheduledRounds == 5
                 st.last_class = f.WeightClass

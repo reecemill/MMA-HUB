@@ -499,3 +499,7 @@ ml/reference_predictions.json
 
 # Trained models (rebuilt by: ml/.venv/bin/python -m ml.v2 winner)
 ml/models/
+
+# Saved BestFightOdds pages and the odds built from them (rebuilt by: python -m ml.odds fetch / build)
+ml/odds/raw/
+ml/odds/out/
