@@ -503,3 +503,4 @@ ml/models/
 # Saved BestFightOdds pages and the odds built from them (rebuilt by: python -m ml.odds fetch / build)
 ml/odds/raw/
 ml/odds/out/
+ml/odds/upcoming/

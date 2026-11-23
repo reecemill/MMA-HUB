@@ -41,6 +41,16 @@ VALIDATION_START = "2022-01-01"
 TEST_START = "2024-01-01"
 
 ELO_START = 1500.0
+# A debutant starts at the average Elo of fighters active in this many years before their
+# debut. Fighters who are cut leave with low ratings, so the active roster sits above
+# ELO_START, and starting newcomers at 1500 underrated every one of them.
+ACTIVE_YEARS = 2
+# On top of that, Elo points per unit of pre-UFC win rate above or below the average debutant's,
+# so an unbeaten prospect starts higher than a fighter with several losses. Chosen on validation
+# with K; 0 is the plain roster average. A full grid (0, 250, 500, 1000) on 2026-11-22 picked 500
+# for every K (validation log loss 0.6474 -> 0.6465 at K=128) but took an hour to run, so only
+# 0 (the comparison, and BEFORE's setting) and 500 are kept.
+DEBUT_SCALES = (0, 500)
 KO_METHODS = {"KO/TKO", "TKO - Doctor's Stoppage"}
 SUB_METHODS = {"Submission"}
 
@@ -97,7 +107,7 @@ FEATURE_SETS = {
     "everything": list(FEATURES),
 }
 # The model the site used before per-fight stats: the baseline every change is measured against.
-BEFORE = {"k": 128, "features": _CURRENT}
+BEFORE = {"elo": (128, 0), "features": _CURRENT}
 # Gradient boosting and the network only try the feature sets with per-fight stats.
 NONLINEAR_SETS = ["+ striking + grappling", "+ striking + grappling + age", "+ stats + matchups + age"]
 # Pseudo-counts that pull a fighter's rates toward the league average until there's data.
@@ -140,7 +150,7 @@ def load(db_path):
         con, parse_dates=["EventDate"])
     fighters = pd.read_sql(
         """select Id, Slug, FirstName || ' ' || LastName as Name, WeightClass as Division,
-                  DateOfBirth, HeightInches, ReachInches, Stance
+                  DateOfBirth, HeightInches, ReachInches, Stance, Wins, Losses
            from UfcFighters""",
         con, parse_dates=["DateOfBirth"])
     rows = pd.read_sql(
@@ -192,8 +202,8 @@ def physical_attributes(fighters, snapshot_date):
 class FighterHistory:
     """What's known about one fighter from their UFC fights so far."""
 
-    def __init__(self):
-        self.elo = ELO_START
+    def __init__(self, elo=ELO_START):
+        self.elo = elo
         self.fights = 0
         self.wins = 0
         self.losses = 0
@@ -306,8 +316,76 @@ def league_priors(fights, stats, before):
     }
 
 
-def walk_fights(fights, phys, snapshot_date, k, stats, priors):
+def pre_ufc_records(fighters, fights):
+    """Each fighter's record before the UFC: UFC.com's pro record minus their UFC record.
+
+    UFC.com's record is today's, so for a fighter who fought elsewhere after their debut
+    (cut and re-signed, say) it also counts those later fights: a small leak, accepted
+    because it's exact for everyone who has only fought in the UFC since. Missing or
+    impossible (negative) records give None.
+    """
+    ufc = {}
+    for b in fights[fights.Status == "completed"].itertuples():
+        for fid in (b.Fighter1Id, b.Fighter2Id):
+            w, l = ufc.get(fid, (0, 0))
+            won = b.WinnerFighterId == fid
+            lost = b.WinnerFighterId in (b.Fighter1Id, b.Fighter2Id) and not won
+            ufc[fid] = (w + won, l + lost)
+    out = {}
+    for r in fighters.itertuples():
+        w, l = ufc.get(r.Id, (0, 0))
+        if pd.isna(r.Wins) or pd.isna(r.Losses) or r.Wins < w or r.Losses < l:
+            out[r.Id] = None
+        else:
+            out[r.Id] = (int(r.Wins) - w, int(r.Losses) - l)
+    return out
+
+
+class DebutSeeder:
+    """Starting Elo for a fighter's first UFC fight: the active roster's average, adjusted by
+    their pre-UFC win rate (smoothed toward 50%) against the average of earlier debutants'."""
+
+    def __init__(self, pre_records, scale):
+        self.pre = pre_records
+        self.scale = scale
+        self.total = 0.0
+        self.count = 0
+
+    def win_rate(self, fid):
+        rec = self.pre.get(fid)
+        return None if rec is None else (rec[0] + 1) / (rec[0] + rec[1] + 2)
+
+    def elo(self, histories, date, fid):
+        start = roster_elo(histories, date)
+        rate = self.win_rate(fid)
+        if rate is not None and self.count:
+            start += self.scale * (rate - self.total / self.count)
+        return start
+
+    def seed(self, histories, date, fid):
+        """A new fighter's history; the average then includes them, for later debutants."""
+        h = FighterHistory(self.elo(histories, date, fid))
+        rate = self.win_rate(fid)
+        if rate is not None:
+            self.total += rate
+            self.count += 1
+        return h
+
+
+def roster_elo(histories, date):
+    """The average Elo of fighters whose last fight was within ACTIVE_YEARS before `date`
+    (ELO_START if there are none yet). Only uses fights already walked, so it's known
+    before any fight on `date` is predicted."""
+    since = date - pd.DateOffset(years=ACTIVE_YEARS)
+    active = [h.elo for h in histories.values() if h.last_fight is not None and h.last_fight >= since]
+    return float(np.mean(active)) if active else ELO_START
+
+
+def walk_fights(fights, phys, snapshot_date, k, stats, priors, seeder):
     """Features for every completed fight (from history before it), and final histories.
+
+    `seeder` (a DebutSeeder) gives each fighter's starting Elo; it's returned too, so
+    fighters still to debut can be seeded the same way.
 
     A fight's own stats are added to each fighter's totals only after its features are
     recorded, like its result.
@@ -323,8 +401,10 @@ def walk_fights(fights, phys, snapshot_date, k, stats, priors):
         a_id, b_id = b.Fighter1Id, b.Fighter2Id
         if a_id not in phys.index or b_id not in phys.index:
             continue
-        ha = histories.setdefault(a_id, FighterHistory())
-        hb = histories.setdefault(b_id, FighterHistory())
+        for fid in (a_id, b_id):
+            if fid not in histories:
+                histories[fid] = seeder.seed(histories, b.EventDate, fid)
+        ha, hb = histories[a_id], histories[b_id]
 
         if b.Fighter1Outcome == "Draw":
             score_a = 0.5
@@ -359,7 +439,7 @@ def walk_fights(fights, phys, snapshot_date, k, stats, priors):
             winner.ko_wins += b.Method in KO_METHODS
             winner.sub_wins += b.Method in SUB_METHODS
             loser.finished += b.Method in KO_METHODS | SUB_METHODS
-    return pd.DataFrame(rows), histories
+    return pd.DataFrame(rows), histories, seeder
 
 
 def symmetric(df):
@@ -511,13 +591,15 @@ def main():
     # --- Choose settings on the validation years -------------------------------------
     # Each family searches Elo K, feature sets, the first year its weights learn from, and its
     # own settings; the lowest log loss wins. Height and reach stay candidates in "everything"
-    # so they keep being checked.
-    walks = {k: walk_fights(fights, phys, snapshot_date, k, stats, priors) for k in (32, 64, 128)}
+    # so they keep being checked. Each walk is one Elo setting: (K, debut scale).
+    pre = pre_ufc_records(fighters, fights)
+    walks = {(k, d): walk_fights(fights, phys, snapshot_date, k, stats, priors, DebutSeeder(pre, d))
+             for k in (32, 64, 128) for d in DEBUT_SCALES}
     print("\nValidation (train before 2022, test 2022-2023):")
     best = {}
     for family, makers in FAMILIES.items():
         sets = FEATURE_SETS if family == "logistic regression" else {n: FEATURE_SETS[n] for n in NONLINEAR_SETS}
-        for k, (data, _) in walks.items():
+        for (k, debut), (data, _, _) in walks.items():
             valid = one_side(data[(data.date >= VALIDATION_START) & (data.date < TEST_START)])
             for since in TRAIN_SINCE:
                 train = learning_rows(data, since, VALIDATION_START)
@@ -525,39 +607,39 @@ def main():
                     for make in makers:
                         model = make(feats).fit(train)
                         s = scores(valid.y, model.predict(valid))
-                        print(f"  {family:<20} K={k:<4} since {since or 'all':<10} {name:<34} {model.describe():<48} "
+                        print(f"  {family:<20} K={k:<4} debut {debut:<5} since {since or 'all':<10} {name:<34} {model.describe():<48} "
                               f"accuracy {s['accuracy']:.3f}  log loss {s['log_loss']:.4f}")
                         if family not in best or s["log_loss"] < best[family]["log_loss"]:
-                            best[family] = {"log_loss": s["log_loss"], "k": k, "since": since, "name": name,
+                            best[family] = {"log_loss": s["log_loss"], "elo": (k, debut), "since": since, "name": name,
                                             "feats": feats, "make": make, "describe": model.describe()}
     print("\nBest of each family on validation:")
     for family, b in best.items():
-        print(f"  {family:<20} log loss {b['log_loss']:.4f}  K={b['k']}, since {b['since'] or 'all'}, "
+        print(f"  {family:<20} log loss {b['log_loss']:.4f}  K={b['elo'][0]}, debut {b['elo'][1]}, since {b['since'] or 'all'}, "
               f"{b['name']}, {b['describe']}")
 
     # --- Report once on the test years -----------------------------------------------
-    def test_predictions(k, since, feats, make):
-        data = walks[k][0]
+    def test_predictions(elo, since, feats, make):
+        data = walks[elo][0]
         model = make(feats).fit(learning_rows(data, since, TEST_START))
         test = one_side(data[data.date >= TEST_START])
         return model, test, model.predict(test)
 
     family_test = {}
     for family, b in best.items():
-        family_model, test, family_test[family] = test_predictions(b["k"], b["since"], b["feats"], b["make"])
+        family_model, test, family_test[family] = test_predictions(b["elo"], b["since"], b["feats"], b["make"])
         # P(A beats B) + P(B beats A) must be exactly 1 for every model.
         flipped = test.copy()
         flipped[list(FEATURES)] = -flipped[list(FEATURES)]
         assert np.allclose(family_test[family] + family_model.predict(flipped), 1), family
-    _, _, p_before = test_predictions(BEFORE["k"], None, BEFORE["features"], lambda f: Model(f, 1.0))
+    _, _, p_before = test_predictions(BEFORE["elo"], None, BEFORE["features"], lambda f: Model(f, 1.0))
 
     # The site runs logistic regression, so that's what's exported; the other families are
     # reported next to it to show whether a non-linear model would be worth deploying.
     site = best["logistic regression"]
-    k, since, name, feats = site["k"], site["since"], site["name"], site["feats"]
-    data, histories = walks[k]
+    (k, debut), since, name, feats = site["elo"], site["since"], site["name"], site["feats"]
+    data, histories, seeder = walks[(k, debut)]
     train = data[data.date < TEST_START]
-    model, test, p = test_predictions(k, since, feats, site["make"])
+    model, test, p = test_predictions((k, debut), since, feats, site["make"])
     c = 1.0
     elo_only = Model(["elo"], c).fit(train).predict(test)
     # Baseline with no model: pick whoever has the better UFC win rate (coin flip on ties).
@@ -599,7 +681,7 @@ def main():
             buckets.append({"from": lo, "to": min(hi, 1.0), "bouts": int(mask.sum()),
                             "predicted": float(fav[mask].mean()),
                             "actual": float(((p > 0.5) == (test.y == 1))[mask].mean())})
-    print(f"\nExported model (logistic regression, K={k}, since {since or 'all'}, {name}) on the test years:")
+    print(f"\nExported model (logistic regression, K={k}, debut scale {debut}, since {since or 'all'}, {name}) on the test years:")
     for label, s in results.items():
         if label not in ("families", "comparisons"):
             print(f"  {label:<20} accuracy {s['accuracy']:.3f}"
@@ -628,6 +710,7 @@ def main():
         "snapshotDate": f"{snapshot_date:%Y-%m-%d}",
         "trainingBouts": int(len(final_rows)),
         "eloK": k,
+        "eloDebutScale": debut,
         "featureSet": name,
         "features": [{"key": f, "label": FEATURES[f], "scale": float(s), "weight": float(w)}
                      for f, s, w in zip(feats, final.scale, coefs)],
@@ -636,9 +719,13 @@ def main():
     }
     (OUT / "model.json").write_text(json.dumps(model_json, indent=2))
 
+    # Fighters with no UFC fight yet (debutants on upcoming cards) start where they would in training.
+    def history(fid):
+        return histories.get(fid) or FighterHistory(seeder.elo(histories, snapshot_date, fid))
+
     profiles = {}
     for fid, row in phys.iterrows():
-        h = histories.get(fid, FighterHistory())
+        h = history(fid)
         profiles[row.Slug] = {
             **{key: round(v, 5) for key, v in h.state(priors).items()},
             "height": round(float(row.height), 2), "reach": round(float(row.reach), 2),
@@ -666,9 +753,9 @@ def main():
     upcoming = fights[(fights.Status == "upcoming") & fights.Fighter1Id.isin(phys.index) & fights.Fighter2Id.isin(phys.index)]
     check = []
     for b in upcoming.itertuples():
-        xa = fighter_vector(histories.get(b.Fighter1Id, FighterHistory()), phys.loc[b.Fighter1Id],
+        xa = fighter_vector(history(b.Fighter1Id), phys.loc[b.Fighter1Id],
                             snapshot_date, b.EventDate, priors)
-        xb = fighter_vector(histories.get(b.Fighter2Id, FighterHistory()), phys.loc[b.Fighter2Id],
+        xb = fighter_vector(history(b.Fighter2Id), phys.loc[b.Fighter2Id],
                             snapshot_date, b.EventDate, priors)
         row = pd.DataFrame([pair_features(xa, xb)])
         check.append({"fight": int(b.Id), "date": f"{b.EventDate:%Y-%m-%d}", "fighter1": phys.loc[b.Fighter1Id].Slug,

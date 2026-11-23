@@ -48,6 +48,26 @@ def _score(a, b):
 def build():
     ds = data.load()
     f = ds.fights[(ds.fights.Date >= SINCE)].copy()
+    slugs = sorted(p.name[:-len(".html.gz")] for p in fetch.RAW.glob("*.html.gz"))
+    out, unmatched = match(ds, f, ((slug, fetch.read(slug)) for slug in slugs))
+    OUT.mkdir(exist_ok=True)
+    out.to_csv(OUT / "closing_lines.csv", index=False)
+    pd.DataFrame(unmatched).to_csv(OUT / "unmatched.csv", index=False)
+
+    decided = f[f.finished]
+    have = set(out.fight_id) if not out.empty else set()
+    print(f"{len(slugs)} pages; {len(have)} UFC.com fights matched; {len(unmatched)} BFO matchups unmatched")
+    print(f"Coverage of finished UFC.com fights since {SINCE:%Y-%m-%d}: {decided.Id.isin(have).mean():.1%} "
+          f"({decided.Id.isin(have).sum()}/{len(decided)})")
+    missing = decided[~decided.Id.isin(have)]
+    if len(missing):
+        print("Missing by year:", missing.Date.dt.year.value_counts().sort_index().to_dict())
+    return out
+
+
+def match(ds, f, pages):
+    """Matches the matchups on BFO pages, given as (slug, html) pairs, to the UFC.com fights
+    in `f`. Returns (consensus lines as in closing_lines.csv, unmatched matchups)."""
     names = {pid: norm(f"{r.FirstName or ''} {r.LastName or ''}") for pid, r in ds.fighters.iterrows()}
     ids_in_window = sorted(set(f.RedId) | set(f.BlueId))
     by_pair = {}
@@ -61,9 +81,7 @@ def build():
 
     cache = {}
     rows, unmatched = [], []
-    slugs = sorted(p.name[:-len(".html.gz")] for p in fetch.RAW.glob("*.html.gz"))
-    for slug in slugs:
-        page = fetch.read(slug)
+    for slug, page in pages:
         lines = parse.parse(page, slug)
         if lines.empty:
             continue
@@ -87,19 +105,7 @@ def build():
         depth = out[out.line == "ML"].set_index(["fight_id", "slug"]).n_books
         best = depth.groupby(level=0).idxmax().map(lambda t: t[1])
         out = out[out.slug == out.fight_id.map(best)]
-    OUT.mkdir(exist_ok=True)
-    out.to_csv(OUT / "closing_lines.csv", index=False)
-    pd.DataFrame(unmatched).to_csv(OUT / "unmatched.csv", index=False)
-
-    decided = f[f.finished]
-    have = set(out.fight_id) if not out.empty else set()
-    print(f"{len(slugs)} pages; {len(have)} UFC.com fights matched; {len(unmatched)} BFO matchups unmatched")
-    print(f"Coverage of finished UFC.com fights since {SINCE:%Y-%m-%d}: {decided.Id.isin(have).mean():.1%} "
-          f"({decided.Id.isin(have).sum()}/{len(decided)})")
-    missing = decided[~decided.Id.isin(have)]
-    if len(missing):
-        print("Missing by year:", missing.Date.dt.year.value_counts().sort_index().to_dict())
-    return out
+    return out, unmatched
 
 
 def _consensus(g, fight, f1_red, n1, n2, slug):

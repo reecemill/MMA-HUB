@@ -3,8 +3,9 @@
 #   1. scrapes what's new from UFC.com into Postgres
 #   2. exports the SQLite snapshot (data/mma.db)
 #   3. retrains the model (src/Web/Data/*.json)
-#   4. commits every change in the repo and pushes it to GitHub
-#   5. deploys the commit and the snapshot to the Hugging Face Space
+#   4. fetches the betting market's lines on upcoming fights (src/Web/Data/market_lines.json)
+#   5. commits every change in the repo and pushes it to GitHub
+#   6. deploys the commit and the snapshot to the Hugging Face Space
 #
 #   scripts/update-site.sh                    commit message "Update data to <today>"
 #   scripts/update-site.sh "Some message"     your own commit message
@@ -23,7 +24,7 @@ for arg in "$@"; do
   case "$arg" in
     --no-scrape) scrape=0 ;;
     --yes) confirm=0 ;;
-    -*) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+    -*) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
     *) message="$arg" ;;
   esac
 done
@@ -41,6 +42,10 @@ step "Exporting the snapshot to data/mma.db"
 
 step "Retraining the model"
 ml/.venv/bin/python ml/train.py
+
+step "Fetching betting lines for upcoming fights"
+# Not fatal: if BestFightOdds is down, the site keeps the last lines (dated in the file).
+ml/.venv/bin/python -m ml.odds upcoming || echo "Couldn't fetch betting lines; keeping the previous ones."
 
 step "Committing"
 git add -A
